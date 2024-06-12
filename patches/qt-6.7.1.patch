@@ -1,0 +1,3192 @@
+--- qtbase/src/widgets/widgets/qdatetimeedit.h	2024-05-08 05:42:08.000000000 -0400
++++ qtbase/src/widgets/widgets/qdatetimeedit.h	2024-05-08 05:42:08.000000000 -0400
+@@ -1,27 +1,28 @@
+ // Copyright (C) 2020 The Qt Company Ltd.
+ // SPDX-License-Identifier: LicenseRef-Qt-Commercial OR LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only
+ 
+ #ifndef QDATETIMEEDIT_H
+ #define QDATETIMEEDIT_H
+ 
+ #include <QtWidgets/qtwidgetsglobal.h>
+ #include <QtCore/qtimezone.h>
+ #include <QtCore/qcalendar.h>
+ #include <QtCore/qvariant.h>
+ #include <QtWidgets/qabstractspinbox.h>
++#include <QtCore/qtdeprecationmarkers.h>
+ 
+ QT_REQUIRE_CONFIG(datetimeedit);
+ 
+ QT_BEGIN_NAMESPACE
+ 
+ class QDateTimeEditPrivate;
+ class QStyleOptionSpinBox;
+ class QCalendarWidget;
+ 
+ class Q_WIDGETS_EXPORT QDateTimeEdit : public QAbstractSpinBox
+ {
+     Q_OBJECT
+ 
+     Q_PROPERTY(QDateTime dateTime READ dateTime WRITE setDateTime NOTIFY dateTimeChanged USER true)
+     Q_PROPERTY(QDate date READ date WRITE setDate NOTIFY dateChanged)
+     Q_PROPERTY(QTime time READ time WRITE setTime NOTIFY timeChanged)
+@@ -115,38 +116,35 @@
+ 
+     QCalendarWidget *calendarWidget() const;
+     void setCalendarWidget(QCalendarWidget *calendarWidget);
+ 
+     int sectionCount() const;
+ 
+     void setSelectedSection(Section section);
+ 
+     QString sectionText(Section section) const;
+ 
+     QString displayFormat() const;
+     void setDisplayFormat(const QString &format);
+ 
+     bool calendarPopup() const;
+     void setCalendarPopup(bool enable);
+ 
+-#if QT_DEPRECATED_SINCE(6, 10)
+-    QT_DEPRECATED_VERSION_X_6_10("Use timeZone() instead")
+     Qt::TimeSpec timeSpec() const;
+-    QT_DEPRECATED_VERSION_X_6_10("Use setTimeZone() instead")
+     void setTimeSpec(Qt::TimeSpec spec);
+-#endif
++
+     QTimeZone timeZone() const;
+     void setTimeZone(const QTimeZone &zone);
+ 
+     QSize sizeHint() const override;
+ 
+     void clear() override;
+     void stepBy(int steps) override;
+ 
+     bool event(QEvent *event) override;
+ Q_SIGNALS:
+     void dateTimeChanged(const QDateTime &dateTime);
+     void timeChanged(QTime time);
+     void dateChanged(QDate date);
+ 
+ public Q_SLOTS:
+     void setDateTime(const QDateTime &dateTime);
+--- qtbase/src/gui/text/qtextengine.cpp	2024-05-08 05:42:08.000000000 -0400
++++ qtbase/src/gui/text/qtextengine.cpp	2024-06-10 19:39:20.568824990 -0400
+@@ -6,36 +6,38 @@
+ #include "qtextformat.h"
+ #include "qtextformat_p.h"
+ #include "qtextengine_p.h"
+ #include "qabstracttextdocumentlayout.h"
+ #include "qabstracttextdocumentlayout_p.h"
+ #include "qtextlayout.h"
+ #include "qtextboundaryfinder.h"
+ #include <QtCore/private/qunicodetables_p.h>
+ #include "qvarlengtharray.h"
+ #include "qfont.h"
+ #include "qfont_p.h"
+ #include "qfontengine_p.h"
+ #include "qstring.h"
+ #include "qtextdocument_p.h"
+ #include "qrawfont.h"
+ #include "qrawfont_p.h"
++
+ #include <qguiapplication.h>
+ #include <qinputmethod.h>
++
+ #include <algorithm>
+-#include <stdlib.h>
++#include <cstdlib>
+ 
+ QT_BEGIN_NAMESPACE
+ 
+ static const float smallCapsFraction = 0.7f;
+ 
+ namespace {
+ // Helper class used in QTextEngine::itemize
+ // keep it out here to allow us to keep supporting various compilers.
+ class Itemizer {
+ public:
+     Itemizer(const QString &string, const QScriptAnalysis *analysis, QScriptItemArray &items)
+         : m_string(string),
+         m_analysis(analysis),
+         m_items(items)
+     {
+     }
+@@ -1279,33 +1281,35 @@
+ 
+     qt_getDefaultJustificationOpportunities(string, length, g, log_clusters, spaceAs);
+ }
+ 
+ #endif // harfbuzz
+ 
+ 
+ // shape all the items that intersect with the line, taking tab widths into account to find out what text actually fits in the line.
+ void QTextEngine::shapeLine(const QScriptLine &line)
+ {
+     QFixed x;
+     bool first = true;
+     int item = findItem(line.from);
+     if (item == -1)
+         return;
+ 
+-    const int end = findItem(line.from + line.length + line.trailingSpaces - 1, item);
++    int end = findItem(line.from + line.length + line.trailingSpaces - 1, item);
++    validate();
++
+     for ( ; item <= end; ++item) {
+         QScriptItem &si = layoutData->items[item];
+         if (si.analysis.flags == QScriptAnalysis::Tab) {
+             ensureSpace(1);
+             si.width = calculateTabWidth(item, x);
+         } else {
+             shape(item);
+         }
+         if (first && si.position != line.from) { // that means our x position has to be offset
+             QGlyphLayout glyphs = shapedGlyphs(&si);
+             Q_ASSERT(line.from > si.position);
+             for (int i = line.from - si.position - 1; i >= 0; i--) {
+                 x -= glyphs.effectiveAdvance(i);
+             }
+         }
+         first = false;
+@@ -1340,70 +1344,72 @@
+             glyphs->glyphs[glyphPosition] = glyph;
+             if (Q_LIKELY(glyphs->glyphs[glyphPosition] != 0)) {
+                 glyphs->glyphs[glyphPosition] |= engineIndex;
+                 QGlyphLayout tmp = glyphs->mid(glyphPosition, 1);
+                 fontEngine->recalcAdvances(&tmp, { });
+             }
+             glyphs->attributes[glyphPosition].dontPrint = true;
+         }
+         break;
+     default:
+         break;
+     }
+ }
+ 
+ void QTextEngine::shapeText(int item) const
+ {
++    validate();
+     Q_ASSERT(item < layoutData->items.size());
+     QScriptItem &si = layoutData->items[item];
+ 
+     if (si.num_glyphs)
+         return;
+ 
+     si.width = 0;
+     si.glyph_data_offset = layoutData->used;
+ 
+-    const ushort *string = reinterpret_cast<const ushort *>(layoutData->string.constData()) + si.position;
++    const ushort *string =
++      reinterpret_cast<const ushort *>(layoutData->string.constData()) + si.position;
+     const int itemLength = length(item);
+ 
+     QString casedString;
+     if (si.analysis.flags && si.analysis.flags <= QScriptAnalysis::SmallCaps) {
+         casedString.resize(itemLength);
+         ushort *uc = reinterpret_cast<ushort *>(casedString.data());
+         for (int i = 0; i < itemLength; ++i) {
+             uint ucs4 = string[i];
+             if (QChar::isHighSurrogate(ucs4) && i + 1 < itemLength) {
+                 uint low = string[i + 1];
+                 if (QChar::isLowSurrogate(low)) {
+                     // high part never changes in simple casing
+                     uc[i] = ucs4;
+                     ++i;
+                     ucs4 = QChar::surrogateToUcs4(ucs4, low);
+                     ucs4 = si.analysis.flags == QScriptAnalysis::Lowercase ? QChar::toLower(ucs4)
+                                                                            : QChar::toUpper(ucs4);
+                     uc[i] = QChar::lowSurrogate(ucs4);
+                 }
+             } else {
+                 uc[i] = si.analysis.flags == QScriptAnalysis::Lowercase ? QChar::toLower(ucs4)
+                                                                         : QChar::toUpper(ucs4);
+             }
+         }
+         string = reinterpret_cast<const ushort *>(casedString.constData());
+     }
+ 
+-    if (Q_UNLIKELY(!ensureSpace(itemLength))) {
++    if (!ensureSpace(itemLength)) {
+         Q_UNREACHABLE_RETURN(); // ### report OOM error somehow
+     }
+ 
+     QFontEngine *fontEngine = this->fontEngine(si, &si.ascent, &si.descent, &si.leading);
+ 
+     bool kerningEnabled;
+     bool letterSpacingIsAbsolute;
+     bool shapingEnabled = false;
+     QHash<QFont::Tag, quint32> features;
+     QFixed letterSpacing, wordSpacing;
+ #ifndef QT_NO_RAWFONT
+     if (useRawFont) {
+         QTextCharFormat f = format(&si);
+         QFont font = f.font();
+         kerningEnabled = font.kerning();
+ #  if QT_CONFIG(harfbuzz)
+@@ -1465,33 +1471,33 @@
+                     si.leading = qMax(actualFontEngine->leading(), si.leading);
+                 }
+ 
+                 lastEngine = engineIdx;
+             }
+ 
+             if (QChar::isHighSurrogate(string[i]) && i + 1 < itemLength && QChar::isLowSurrogate(string[i + 1]))
+                 ++i;
+         }
+     } else {
+         itemBoundaries.push_back(0);
+         itemBoundaries.push_back(0);
+         itemBoundaries.push_back(0);
+     }
+ 
+ #if QT_CONFIG(harfbuzz)
+-    if (Q_LIKELY(shapingEnabled)) {
++    if (shapingEnabled) {
+         si.num_glyphs = shapeTextWithHarfbuzzNG(si,
+                                                 string,
+                                                 itemLength,
+                                                 fontEngine,
+                                                 itemBoundaries,
+                                                 kerningEnabled,
+                                                 letterSpacing != 0,
+                                                 features);
+     } else
+ #endif
+     {
+         ushort *log_clusters = logClusters(&si);
+ 
+         int glyph_pos = 0;
+         for (int i = 0; i < itemLength; ++i, ++glyph_pos) {
+             log_clusters[i] = glyph_pos;
+@@ -1508,54 +1514,53 @@
+             }
+ 
+             if (Q_UNLIKELY(!initialGlyphs.attributes[glyph_pos].dontPrint)) {
+                 QFontEngine *actualFontEngine = fontEngine;
+                 if (actualFontEngine->type() == QFontEngine::Multi) {
+                     const uint engineIdx = initialGlyphs.glyphs[glyph_pos] >> 24;
+                     actualFontEngine = static_cast<QFontEngineMulti *>(fontEngine)->engine(engineIdx);
+                 }
+ 
+                 applyVisibilityRules(string[i], &initialGlyphs, glyph_pos, actualFontEngine);
+             }
+         }
+ 
+         si.num_glyphs = glyph_pos;
+     }
+ 
+-    if (Q_UNLIKELY(si.num_glyphs == 0)) {
+-        if (Q_UNLIKELY(!ensureSpace(si.glyph_data_offset + 1))) {
++    if (si.num_glyphs == 0) {
++        if (!ensureSpace(si.glyph_data_offset + 1)) {
+             qWarning() << "Unable to allocate space for place-holder glyph";
+             return;
+         }
+ 
+         si.num_glyphs = 1;
+ 
+         // Overwrite with 0 token to indicate failure
+         QGlyphLayout g = availableGlyphs(&si);
+         g.glyphs[0] = 0;
+         g.attributes[0].clusterStart = true;
+ 
+         ushort *log_clusters = logClusters(&si);
+         for (int i = 0; i < itemLength; ++i)
+             log_clusters[i] = 0;
+ 
+         return;
+     }
+ 
+     layoutData->used += si.num_glyphs;
+-
+     QGlyphLayout glyphs = shapedGlyphs(&si);
+ 
+ #if QT_CONFIG(harfbuzz)
+     qt_getJustificationOpportunities(string, itemLength, si, glyphs, logClusters(&si));
+ #endif
+ 
+     if (letterSpacing != 0) {
+         for (int i = 1; i < si.num_glyphs; ++i) {
+             if (glyphs.attributes[i].clusterStart) {
+                 if (letterSpacingIsAbsolute)
+                     glyphs.advances[i - 1] += letterSpacing;
+                 else {
+                     QFixed &advance = glyphs.advances[i - 1];
+                     advance += (letterSpacing - 100) * advance / 100;
+                 }
+             }
+@@ -1593,268 +1598,295 @@
+ QT_END_INCLUDE_NAMESPACE
+ 
+ int QTextEngine::shapeTextWithHarfbuzzNG(const QScriptItem &si,
+                                          const ushort *string,
+                                          int itemLength,
+                                          QFontEngine *fontEngine,
+                                          QSpan<uint> itemBoundaries,
+                                          bool kerningEnabled,
+                                          bool hasLetterSpacing,
+                                          const QHash<QFont::Tag, quint32> &fontFeatures) const
+ {
+     uint glyphs_shaped = 0;
+ 
+     hb_buffer_t *buffer = hb_buffer_create();
+     hb_buffer_set_unicode_funcs(buffer, hb_qt_get_unicode_funcs());
+     hb_buffer_pre_allocate(buffer, itemLength);
+-    if (Q_UNLIKELY(!hb_buffer_allocation_successful(buffer))) {
++    if (!hb_buffer_allocation_successful(buffer)) {
+         hb_buffer_destroy(buffer);
+         return 0;
+     }
+ 
+     hb_segment_properties_t props = HB_SEGMENT_PROPERTIES_DEFAULT;
+     props.direction = si.analysis.bidiLevel % 2 ? HB_DIRECTION_RTL : HB_DIRECTION_LTR;
+     QChar::Script script = QChar::Script(si.analysis.script);
+     props.script = hb_qt_script_to_script(script);
+     // ### TODO get_default_for_script?
+     props.language = hb_language_get_default(); // use default language from locale
+ 
+     for (qsizetype k = 0; k < itemBoundaries.size(); k += 3) {
+-        const uint item_pos = itemBoundaries[k];
+-        const uint item_length = (k + 4 < itemBoundaries.size() ? itemBoundaries[k + 3] : itemLength) - item_pos;
+-        const uint engineIdx = itemBoundaries[k + 2];
+-
+-        QFontEngine *actualFontEngine = fontEngine->type() != QFontEngine::Multi ? fontEngine
+-                                                                                 : static_cast<QFontEngineMulti *>(fontEngine)->engine(engineIdx);
++        uint item_pos = itemBoundaries[k];
++        uint item_length = (k + 4 < itemBoundaries.size() ?
++                            itemBoundaries[k + 3] :
++                            itemLength) - item_pos;
++        uint engineIdx = itemBoundaries[k + 2];
++
++        QFontEngine *actualFontEngine =
++          fontEngine->type() != QFontEngine::Multi ? fontEngine :
++                    static_cast<QFontEngineMulti *>(fontEngine)->engine(engineIdx);
+ 
+ 
+         // prepare buffer
+         hb_buffer_clear_contents(buffer);
+-        hb_buffer_add_utf16(buffer, reinterpret_cast<const uint16_t *>(string) + item_pos, item_length, 0, item_length);
++        hb_buffer_add_utf16(buffer,
++                            reinterpret_cast<const uint16_t *>(string) + item_pos,
++                            item_length, 0, item_length);
+ 
+         hb_buffer_set_segment_properties(buffer, &props);
+-
+         uint buffer_flags = HB_BUFFER_FLAG_DEFAULT;
+-        // Symbol encoding used to encode various crap in the 32..255 character code range,
+-        // and thus might override U+00AD [SHY]; avoid hiding default ignorables
+-        if (Q_UNLIKELY(actualFontEngine->symbol))
++
++        // Symbol encoding used to encode various crap in the 32..255 character
++        // code range, and thus might override U+00AD [SHY]; avoid hiding default
++        // ignorables
++        if (actualFontEngine->symbol) {
+             buffer_flags |= HB_BUFFER_FLAG_PRESERVE_DEFAULT_IGNORABLES;
++        }
++
+         hb_buffer_set_flags(buffer, hb_buffer_flags_t(buffer_flags));
+ 
+ 
+         // shape
+         {
+             hb_font_t *hb_font = hb_qt_font_get_for_engine(actualFontEngine);
+             Q_ASSERT(hb_font);
+-            hb_qt_font_set_use_design_metrics(hb_font, option.useDesignMetrics() ? uint(QFontEngine::DesignMetrics) : 0); // ###
+-
+-            // Ligatures are incompatible with custom letter spacing, so when a letter spacing is set,
+-            // we disable them for writing systems where they are purely cosmetic.
+-            bool scriptRequiresOpenType = ((script >= QChar::Script_Syriac && script <= QChar::Script_Sinhala)
+-                                         || script == QChar::Script_Khmer || script == QChar::Script_Nko);
++            hb_qt_font_set_use_design_metrics(hb_font,
++                                              option.useDesignMetrics() ?
++                                              uint(QFontEngine::DesignMetrics) : 0); // ###
++
++            // Ligatures are incompatible with custom letter spacing,
++            // so when a letter spacing is setwe disable them for
++            // writing systems where they are purely cosmetic.
++            bool scriptRequiresOpenType =
++              ((script >= QChar::Script_Syriac && script <= QChar::Script_Sinhala) ||
++               script == QChar::Script_Khmer || script == QChar::Script_Nko);
+ 
+             bool dontLigate = hasLetterSpacing && !scriptRequiresOpenType;
+ 
+             QHash<QFont::Tag, quint32> features;
+             features.insert(QFont::Tag("kern"), !!kerningEnabled);
+             if (dontLigate) {
+                 features.insert(QFont::Tag("liga"), false);
+                 features.insert(QFont::Tag("clig"), false);
+                 features.insert(QFont::Tag("dlig"), false);
+                 features.insert(QFont::Tag("hlig"), false);
+             }
++
+             features.insert(fontFeatures);
+ 
+             QVarLengthArray<hb_feature_t, 16> featureArray;
+             for (auto it = features.constBegin(); it != features.constEnd(); ++it) {
+                 featureArray.append({ it.key().value(),
+                                       it.value(),
+                                       HB_FEATURE_GLOBAL_START,
+                                       HB_FEATURE_GLOBAL_END });
+             }
+ 
+             // whitelist cross-platforms shapers only
+             static const char *shaper_list[] = {
+                 "graphite2",
+                 "ot",
+                 "fallback",
+                 nullptr
+             };
+ 
+             bool shapedOk = hb_shape_full(hb_font,
+                                           buffer,
+                                           featureArray.constData(),
+                                           features.size(),
+                                           shaper_list);
+-            if (Q_UNLIKELY(!shapedOk)) {
++            if (!shapedOk) {
+                 hb_buffer_destroy(buffer);
+                 return 0;
+             }
+ 
+-            if (Q_UNLIKELY(HB_DIRECTION_IS_BACKWARD(props.direction)))
++            if (HB_DIRECTION_IS_BACKWARD(props.direction))
+                 hb_buffer_reverse(buffer);
+         }
+ 
+         uint num_glyphs = hb_buffer_get_length(buffer);
+-        const bool has_glyphs = num_glyphs > 0;
++        bool has_glyphs = num_glyphs > 0;
+         // If Harfbuzz returns zero glyphs, we have to manually add a missing glyph
+-        if (Q_UNLIKELY(!has_glyphs))
++        if (!has_glyphs)
+             num_glyphs = 1;
+ 
+         // ensure we have enough space for shaped glyphs and metrics
+-        if (Q_UNLIKELY(!ensureSpace(glyphs_shaped + num_glyphs))) {
++        if (!ensureSpace(glyphs_shaped + num_glyphs)) {
+             hb_buffer_destroy(buffer);
+             return 0;
+         }
+ 
+         // fetch the shaped glyphs and metrics
+         QGlyphLayout g = availableGlyphs(&si).mid(glyphs_shaped, num_glyphs);
+         ushort *log_clusters = logClusters(&si) + item_pos;
+-        if (Q_LIKELY(has_glyphs)) {
++        if (has_glyphs) {
+             hb_glyph_info_t *infos = hb_buffer_get_glyph_infos(buffer, nullptr);
+             hb_glyph_position_t *positions = hb_buffer_get_glyph_positions(buffer, nullptr);
+             uint str_pos = 0;
+             uint last_cluster = ~0u;
+             uint last_glyph_pos = glyphs_shaped;
+             for (uint i = 0; i < num_glyphs; ++i, ++infos, ++positions) {
+                 g.glyphs[i] = infos->codepoint;
+ 
+                 g.advances[i] = QFixed::fromFixed(positions->x_advance);
+                 g.offsets[i].x = QFixed::fromFixed(positions->x_offset);
+                 g.offsets[i].y = QFixed::fromFixed(positions->y_offset);
+ 
+                 uint cluster = infos->cluster;
+-                if (Q_LIKELY(last_cluster != cluster)) {
++                if (last_cluster != cluster) {
+                     g.attributes[i].clusterStart = true;
+ 
+                     // fix up clusters so that the cluster indices will be monotonic
+                     // and thus we never return out-of-order indices
+-                    while (last_cluster++ < cluster && str_pos < item_length)
++                    while (last_cluster < cluster && str_pos < item_length) {
+                         log_clusters[str_pos++] = last_glyph_pos;
++                        ++last_cluster;
++                    }
++
+                     last_glyph_pos = i + glyphs_shaped;
+                     last_cluster = cluster;
+ 
+-                    applyVisibilityRules(string[item_pos + str_pos], &g, i, actualFontEngine);
++                    applyVisibilityRules(string[item_pos + str_pos], &g, i,
++                                         actualFontEngine);
+                 }
+             }
++
+             while (str_pos < item_length)
+                 log_clusters[str_pos++] = last_glyph_pos;
+         } else { // Harfbuzz did not return a glyph for the character, so we add a placeholder
+             g.glyphs[0] = 0;
+             g.advances[0] = QFixed{};
+             g.offsets[0].x = QFixed{};
+             g.offsets[0].y = QFixed{};
+             g.attributes[0].clusterStart = true;
+             g.attributes[0].dontPrint = true;
+             log_clusters[0] = glyphs_shaped;
+         }
+ 
+-        if (Q_UNLIKELY(engineIdx != 0)) {
++        if (engineIdx != 0) {
+             for (quint32 i = 0; i < num_glyphs; ++i)
+                 g.glyphs[i] |= (engineIdx << 24);
+         }
+ 
+         if (!actualFontEngine->supportsHorizontalSubPixelPositions()) {
+             for (uint i = 0; i < num_glyphs; ++i) {
+                 g.advances[i] = g.advances[i].round();
+                 g.offsets[i].x = g.offsets[i].x.round();
+             }
+         }
+ 
+         glyphs_shaped += num_glyphs;
+     }
+ 
+     hb_buffer_destroy(buffer);
+ 
+     return glyphs_shaped;
+ }
+ 
+ #endif // harfbuzz
+ 
+ void QTextEngine::init(QTextEngine *e)
+ {
+     e->ignoreBidi = false;
+     e->cacheGlyphs = false;
+     e->forceJustification = false;
+     e->visualMovement = false;
+     e->delayDecorations = false;
+ 
+-    e->layoutData = nullptr;
++    e->layoutData = new QTextEngine::LayoutData();
++    Q_ASSERT(e->layoutData);
+ 
+     e->minWidth = 0;
+     e->maxWidth = 0;
+ 
+     e->specialData = nullptr;
+     e->stackEngine = false;
+ #ifndef QT_NO_RAWFONT
+     e->useRawFont = false;
+ #endif
+ }
+ 
+ QTextEngine::QTextEngine()
+ {
+     init(this);
++    Q_ASSERT(layoutData);
+ }
+ 
+ QTextEngine::QTextEngine(const QString &str, const QFont &f)
+     : text(str),
+       fnt(f)
+ {
+     init(this);
++    Q_ASSERT(layoutData);
+ }
+ 
+ QTextEngine::~QTextEngine()
+ {
+     if (!stackEngine)
+         delete layoutData;
+     delete specialData;
+     resetFontEngineCache();
+ }
+ 
+ const QCharAttributes *QTextEngine::attributes() const
+ {
++    validate();
+     if (layoutData && layoutData->haveCharAttributes)
+         return (QCharAttributes *) layoutData->memory;
+ 
+     itemize();
+     if (! ensureSpace(layoutData->string.size()))
+         return nullptr;
+ 
+     QVarLengthArray<QUnicodeTools::ScriptItem> scriptItems(layoutData->items.size());
+     for (int i = 0; i < layoutData->items.size(); ++i) {
+         const QScriptItem &si = layoutData->items.at(i);
+         scriptItems[i].position = si.position;
+         scriptItems[i].script = QChar::Script(si.analysis.script);
+     }
+ 
+     QUnicodeTools::initCharAttributes(
+         layoutData->string,
+         scriptItems.data(), scriptItems.size(),
+         reinterpret_cast<QCharAttributes *>(layoutData->memory),
+         QUnicodeTools::CharAttributeOptions(QUnicodeTools::GraphemeBreaks
+                                             | QUnicodeTools::LineBreaks
+                                             | QUnicodeTools::WhiteSpaces
+                                             | QUnicodeTools::HangulLineBreakTailoring));
+ 
+ 
+     layoutData->haveCharAttributes = true;
+     return (QCharAttributes *) layoutData->memory;
+ }
+ 
+ void QTextEngine::shape(int item) const
+ {
++    validate();
++
++    if (layoutData->items.size() == 0)
++      return;
++
+     auto &li = layoutData->items[item];
+     if (li.analysis.flags == QScriptAnalysis::Object) {
+         ensureSpace(1);
+         if (QTextDocumentPrivate::get(block) != nullptr) {
+             docLayout()->resizeInlineObject(QTextInlineObject(item, const_cast<QTextEngine *>(this)),
+                                             li.position + block.position(),
+                                             format(&li));
+         }
+         // fix log clusters to point to the previous glyph, as the object doesn't have a glyph of it's own.
+         // This is required so that all entries in the array get initialized and are ordered correctly.
+         if (layoutData->logClustersPtr) {
+             ushort *lc = logClusters(&li);
+             *lc = (lc != layoutData->logClustersPtr) ? lc[-1] : 0;
+         }
+     } else if (li.analysis.flags == QScriptAnalysis::Tab) {
+         // set up at least the ascent/descent/leading of the script item for the tab
+@@ -1885,49 +1917,53 @@
+ void QTextEngine::invalidate()
+ {
+     freeMemory();
+     minWidth = 0;
+     maxWidth = 0;
+ 
+     resetFontEngineCache();
+ }
+ 
+ void QTextEngine::clearLineData()
+ {
+     lines.clear();
+ }
+ 
+ void QTextEngine::validate() const
+ {
+-    if (layoutData)
++    if (layoutData != nullptr)
+         return;
++
+     layoutData = new LayoutData();
++    Q_ASSERT(layoutData);
++
+     if (QTextDocumentPrivate::get(block) != nullptr) {
+         layoutData->string = block.text();
+         const bool nextBlockValid = block.next().isValid();
+         if (!nextBlockValid && option.flags() & QTextOption::ShowDocumentTerminator) {
+             layoutData->string += QLatin1Char('\xA7');
+         } else if (option.flags() & QTextOption::ShowLineAndParagraphSeparators) {
+             layoutData->string += QLatin1Char(nextBlockValid ? '\xB6' : '\x20');
+         }
+-
+     } else {
+         layoutData->string = text;
+     }
++
+     if (specialData && specialData->preeditPosition != -1)
+-        layoutData->string.insert(specialData->preeditPosition, specialData->preeditText);
++      layoutData->string.insert(specialData->preeditPosition,
++                                specialData->preeditText);
+ }
+ 
+ void QTextEngine::itemize() const
+ {
+     validate();
+     if (layoutData->items.size())
+         return;
+ 
+     int length = layoutData->string.size();
+     if (!length)
+         return;
+ 
+     const ushort *string = reinterpret_cast<const ushort *>(layoutData->string.unicode());
+ 
+     bool rtl = isRightToLeft();
+ 
+@@ -2627,129 +2663,161 @@
+         if (pdev)
+             f = QFont(f, pdev);
+         e = f.d->engineForScript(QChar::Script_Common);
+     } else {
+         e = eng->fnt.d->engineForScript(QChar::Script_Common);
+     }
+ 
+     QFixed other_ascent = e->ascent();
+     QFixed other_descent = e->descent();
+     QFixed other_leading = e->leading();
+     leading = qMax(leading + ascent, other_leading + other_ascent) - qMax(ascent, other_ascent);
+     ascent = qMax(ascent, other_ascent);
+     descent = qMax(descent, other_descent);
+ }
+ 
+ QTextEngine::LayoutData::LayoutData()
++    : items(), allocated(0), available_glyphs(), bytesAllocated(0),
++    memory(nullptr), logClustersPtr(nullptr), glyphLayout(), used(0),
++    hasBidi(0), layoutState(LayoutEmpty), memory_on_stack(0),
++    haveCharAttributes(0), currentMaxWidth(0), string()
+ {
+-    memory = nullptr;
+-    allocated = 0;
+-    memory_on_stack = false;
+-    used = 0;
+-    hasBidi = false;
+-    layoutState = LayoutEmpty;
+-    haveCharAttributes = false;
+-    logClustersPtr = nullptr;
+-    available_glyphs = 0;
+-    currentMaxWidth = 0;
+ }
+ 
+-QTextEngine::LayoutData::LayoutData(const QString &str, void **stack_memory, qsizetype _allocated)
+-    : string(str)
++QTextEngine::LayoutData::LayoutData(const QString &str, void **stack_memory,
++                                    qsizetype _allocated)
++    : items(), allocated(0), available_glyphs(), bytesAllocated(0),
++    memory(nullptr), logClustersPtr(nullptr), glyphLayout(), used(0),
++    hasBidi(0), layoutState(LayoutEmpty), memory_on_stack(0),
++    haveCharAttributes(0), currentMaxWidth(0), string(str)
+ {
+     allocated = _allocated;
+ 
+     constexpr qsizetype voidSize = sizeof(void*);
+-    qsizetype space_charAttributes = sizeof(QCharAttributes) * string.size() / voidSize + 1;
+-    qsizetype space_logClusters = sizeof(unsigned short) * string.size() / voidSize + 1;
+-    available_glyphs = (allocated - space_charAttributes - space_logClusters) * voidSize / QGlyphLayout::SpaceNeeded;
++    qsizetype space_charAttributes =
++      sizeof(QCharAttributes) * string.size() / voidSize + 1;
++    qsizetype space_logClusters =
++      sizeof(unsigned short) * string.size() / voidSize + 1;
++    available_glyphs = (allocated - space_charAttributes - space_logClusters) *
++                        voidSize / QGlyphLayout::SpaceNeeded;
+ 
+     if (available_glyphs < str.size()) {
+         // need to allocate on the heap
+         allocated = 0;
+ 
+         memory_on_stack = false;
+         memory = nullptr;
+         logClustersPtr = nullptr;
+     } else {
+         memory_on_stack = true;
+         memory = stack_memory;
+         logClustersPtr = (unsigned short *)(memory + space_charAttributes);
+ 
+         void *m = memory + space_charAttributes + space_logClusters;
+         glyphLayout = QGlyphLayout(reinterpret_cast<char *>(m), str.size());
+         glyphLayout.clear();
+-        memset(memory, 0, space_charAttributes*sizeof(void *));
++        (void) memset(memory, 0, space_charAttributes * sizeof(void *));
+     }
++
+     used = 0;
+     hasBidi = false;
+     layoutState = LayoutEmpty;
+     haveCharAttributes = false;
+     currentMaxWidth = 0;
+ }
+ 
+ QTextEngine::LayoutData::~LayoutData()
+ {
+     if (!memory_on_stack)
+         free(memory);
+     memory = nullptr;
+ }
+ 
+ bool QTextEngine::LayoutData::reallocate(int totalGlyphs)
+ {
+     Q_ASSERT(totalGlyphs >= glyphLayout.numGlyphs);
+     if (memory_on_stack && available_glyphs >= totalGlyphs) {
+         glyphLayout.grow(glyphLayout.data(), totalGlyphs);
+         return true;
+     }
+ 
+-    const qsizetype space_charAttributes = (sizeof(QCharAttributes) * string.size() / sizeof(void*) + 1);
+-    const qsizetype space_logClusters = (sizeof(unsigned short) * string.size() / sizeof(void*) + 1);
+-    const qsizetype space_glyphs = qsizetype(totalGlyphs) * QGlyphLayout::SpaceNeeded / sizeof(void *) + 2;
++    qsizetype space_charAttributes =
++      (sizeof(QCharAttributes) * string.size() / sizeof(void*) + 1);
++    qsizetype space_logClusters =
++      (sizeof(unsigned short) * string.size() / sizeof(void*) + 1);
++    qsizetype space_glyphs =
++      qsizetype(totalGlyphs) * QGlyphLayout::SpaceNeeded / sizeof(void *) + 2;
++    qsizetype newAllocated =
++      space_charAttributes + space_glyphs + space_logClusters;
+ 
+-    const qsizetype newAllocated = space_charAttributes + space_glyphs + space_logClusters;
+     // Check if the length of string/glyphs causes int overflow,
+     // we can't layout such a long string all at once, so return false here to
+     // indicate there is a failure
+-    if (size_t(space_charAttributes) > INT_MAX || size_t(space_logClusters) > INT_MAX || totalGlyphs < 0
+-        || size_t(space_glyphs) > INT_MAX || size_t(newAllocated) > INT_MAX || newAllocated < allocated) {
++    if (size_t(space_charAttributes) > INT_MAX || size_t(space_logClusters) > INT_MAX ||
++        totalGlyphs < 0 || size_t(space_glyphs) > INT_MAX ||
++        size_t(newAllocated) > INT_MAX || newAllocated < allocated) {
++        layoutState = LayoutFailed;
++        return false;
++    }
++
++    void* allocMem = nullptr;
++    qsizetype alignedAllocation = (newAllocated + 7) & ~7;
++
++#if (Q_OS_WINDOWS)
++    allocMem = _aligned_malloc(alignedAllocation * sizeof(void*), 8U);
++#else
++    allocMem = std::aligned_alloc(8U, alignedAllocation * sizeof(void*));
++#endif
++
++    if (!allocMem) {
+         layoutState = LayoutFailed;
+         return false;
+     }
+ 
+-    void **newMem = (void **)::realloc(memory_on_stack ? nullptr : memory, newAllocated*sizeof(void *));
++    bytesAllocated = alignedAllocation * sizeof(void*);
++    (void) memset(allocMem, 0, bytesAllocated);
++    void** newMem = reinterpret_cast<void**>(allocMem);
++
+     if (!newMem) {
+         layoutState = LayoutFailed;
+         return false;
+     }
+-    if (memory_on_stack)
+-        memcpy(newMem, memory, allocated*sizeof(void *));
++
++    (void) memcpy(newMem, memory, allocated * sizeof(void*));
++    if (!memory_on_stack) {
++#if (Q_OS_WINDOWS)
++      _aligned_free(memory);
++#else
++      std::free(memory);
++#endif
++    }
++
+     memory = newMem;
+     memory_on_stack = false;
+ 
+     void **m = memory;
+     m += space_charAttributes;
+-    logClustersPtr = (unsigned short *) m;
++    logClustersPtr = reinterpret_cast<unsigned short*>(m);
+     m += space_logClusters;
+ 
+     const qsizetype space_preGlyphLayout = space_charAttributes + space_logClusters;
+     if (allocated < space_preGlyphLayout)
+-        memset(memory + allocated, 0, (space_preGlyphLayout - allocated)*sizeof(void *));
++        (void) memset(memory + allocated, 0,
++                      (space_preGlyphLayout - allocated) * sizeof(void*));
+ 
+     glyphLayout.grow(reinterpret_cast<char *>(m), totalGlyphs);
+-
+     allocated = newAllocated;
+     return true;
+ }
+ 
+ // grow to the new size, copying the existing data to the new layout
+ void QGlyphLayout::grow(char *address, int totalGlyphs)
+ {
+     QGlyphLayout oldLayout(address, numGlyphs);
+     QGlyphLayout newLayout(address, totalGlyphs);
+ 
+     if (numGlyphs) {
+         // move the existing data
+         memmove(newLayout.attributes, oldLayout.attributes, numGlyphs * sizeof(QGlyphAttributes));
+         memmove(newLayout.justifications, oldLayout.justifications, numGlyphs * sizeof(QGlyphJustification));
+         memmove(newLayout.advances, oldLayout.advances, numGlyphs * sizeof(QFixed));
+         memmove(newLayout.glyphs, oldLayout.glyphs, numGlyphs * sizeof(glyph_t));
+@@ -2761,34 +2829,36 @@
+     *this = newLayout;
+ }
+ 
+ void QTextEngine::freeMemory()
+ {
+     if (!stackEngine) {
+         delete layoutData;
+         layoutData = nullptr;
+     } else {
+         layoutData->used = 0;
+         layoutData->hasBidi = false;
+         layoutData->layoutState = LayoutEmpty;
+         layoutData->haveCharAttributes = false;
+         layoutData->currentMaxWidth = 0;
+         layoutData->items.clear();
+     }
++
+     if (specialData)
+         specialData->resolvedFormats.clear();
++
+     for (int i = 0; i < lines.size(); ++i) {
+         lines[i].justified = 0;
+         lines[i].gridfitted = 0;
+     }
+ }
+ 
+ int QTextEngine::formatIndex(const QScriptItem *si) const
+ {
+     if (specialData && !specialData->resolvedFormats.isEmpty()) {
+         QTextFormatCollection *collection = formatCollection();
+         Q_ASSERT(collection);
+         return collection->indexForFormat(specialData->resolvedFormats.at(si - &layoutData->items.at(0)));
+     }
+ 
+     const QTextDocumentPrivate *p = QTextDocumentPrivate::get(block);
+     if (!p)
+--- qtbase/src/gui/text/qtextengine_p.h	2024-05-08 05:42:08.000000000 -0400
++++ qtbase/src/gui/text/qtextengine_p.h	2024-06-10 19:39:20.568824990 -0400
+@@ -363,40 +363,41 @@
+ class QTextFormatCollection;
+ 
+ class Q_GUI_EXPORT QTextEngine {
+ public:
+     enum LayoutState {
+         LayoutEmpty,
+         InLayout,
+         LayoutFailed
+     };
+     struct Q_GUI_EXPORT LayoutData {
+         LayoutData(const QString &str, void **stack_memory, qsizetype mem_size);
+         LayoutData();
+         ~LayoutData();
+         mutable QScriptItemArray items;
+         qsizetype allocated;
+         qsizetype available_glyphs;
++        qsizetype bytesAllocated;
+         void **memory;
+         unsigned short *logClustersPtr;
+         QGlyphLayout glyphLayout;
+         mutable int used;
+-        uint hasBidi : 1;
++        uint hasBidi : 8;
+         uint layoutState : 2;
+-        uint memory_on_stack : 1;
+-        uint haveCharAttributes : 1;
++        uint memory_on_stack : 8;
++        uint haveCharAttributes : 8;
+         QFixed currentMaxWidth;
+         QString string;
+         bool reallocate(int totalGlyphs);
+     };
+ 
+     struct ItemDecoration {
+         ItemDecoration() { } // for QList, don't use
+         ItemDecoration(qreal x1, qreal x2, qreal y, const QPen &pen):
+             x1(x1), x2(x2), y(y), pen(pen) {}
+ 
+         qreal x1;
+         qreal x2;
+         qreal y;
+         QPen pen;
+     };
+ 
+@@ -418,81 +419,90 @@
+ 
+     bool isRightToLeft() const;
+     static void bidiReorder(int numRuns, const quint8 *levels, int *visualOrder);
+ 
+     const QCharAttributes *attributes() const;
+ 
+     void shape(int item) const;
+ 
+     void justify(const QScriptLine &si);
+     QFixed alignLine(const QScriptLine &line);
+ 
+     QFixed width(int charFrom, int numChars) const;
+     glyph_metrics_t boundingBox(int from,  int len) const;
+     glyph_metrics_t tightBoundingBox(int from,  int len) const;
+ 
+     int length(int item) const {
++        validate();
+         const QScriptItem &si = layoutData->items[item];
+         int from = si.position;
+         item++;
+-        return (item < layoutData->items.size() ? layoutData->items[item].position : layoutData->string.size()) - from;
++        return (item < layoutData->items.size() ? layoutData->items[item].position :
++                                                  layoutData->string.size()) - from;
+     }
+     int length(const QScriptItem *si) const {
++        validate();
+         int end;
+         if (si + 1 < layoutData->items.constData()+ layoutData->items.size())
+             end = (si+1)->position;
+         else
+             end = layoutData->string.size();
+         return end - si->position;
+     }
+ 
+     QFontEngine *fontEngine(const QScriptItem &si, QFixed *ascent = nullptr, QFixed *descent = nullptr, QFixed *leading = nullptr) const;
+     QFont font(const QScriptItem &si) const;
+     inline QFont font() const { return fnt; }
+ 
+     /**
+      * Returns a pointer to an array of log clusters, offset at the script item.
+      * Each item in the array is a unsigned short.  For each character in theinal string there is an entry in the table
+      * so there is a one to one correlation in indexes between theinal text and the index in the logcluster.
+      * The value of each item is the position in the glyphs array. Multiple similar pointers in the logclusters array imply
+      * that one glyph is used for more than one character.
+      * \sa glyphs()
+      */
+-    inline unsigned short *logClusters(const QScriptItem *si) const
+-        { return layoutData->logClustersPtr+si->position; }
++    inline unsigned short *logClusters(const QScriptItem *si) const {
++      validate();
++      return layoutData->logClustersPtr+si->position;
++    }
++
+     /**
+      * Returns an array of QGlyphLayout items, offset at the script item.
+      * Each item in the array matches one glyph in the text, storing the advance, position etc.
+      * The returned item's length equals to the number of available glyphs. This may be more
+      * than what was actually shaped.
+      * \sa logClusters()
+      */
+     inline QGlyphLayout availableGlyphs(const QScriptItem *si) const {
++        validate();
+         return layoutData->glyphLayout.mid(si->glyph_data_offset);
+     }
+     /**
+      * Returns an array of QGlyphLayout items, offset at the script item.
+      * Each item in the array matches one glyph in the text, storing the advance, position etc.
+      * The returned item's length equals to the number of shaped glyphs.
+      * \sa logClusters()
+      */
+     inline QGlyphLayout shapedGlyphs(const QScriptItem *si) const {
++        validate();
+         return layoutData->glyphLayout.mid(si->glyph_data_offset, si->num_glyphs);
+     }
+ 
+     inline bool ensureSpace(int nGlyphs) const {
++        validate();
+         if (layoutData->glyphLayout.numGlyphs - layoutData->used < nGlyphs)
+             return layoutData->reallocate((((layoutData->used + nGlyphs)*3/2 + 15) >> 4) << 4);
+         return true;
+     }
+ 
+     void freeMemory();
+ 
+     int findItem(int strPos, int firstItem = 0) const;
+     inline QTextFormatCollection *formatCollection() const {
+         if (QTextDocumentPrivate::get(block) != nullptr)
+             return const_cast<QTextFormatCollection *>(QTextDocumentPrivate::get(block)->formatCollection());
+         return specialData ? specialData->formatCollection.data() : nullptr;
+     }
+     QTextCharFormat format(const QScriptItem *si) const;
+     inline QAbstractTextDocumentLayout *docLayout() const {
+         Q_ASSERT(QTextDocumentPrivate::get(block) != nullptr);
+@@ -624,37 +634,38 @@
+                                 const ushort *string,
+                                 int itemLength,
+                                 QFontEngine *fontEngine,
+                                 QSpan<uint> itemBoundaries,
+                                 bool kerningEnabled,
+                                 bool hasLetterSpacing,
+                                 const QHash<QFont::Tag, quint32> &features) const;
+ #endif
+ 
+     int endOfLine(int lineNum);
+     int beginningOfLine(int lineNum);
+     int getClusterLength(unsigned short *logClusters, const QCharAttributes *attributes, int from, int to, int glyph_pos, int *start);
+ };
+ 
+ class Q_GUI_EXPORT QStackTextEngine : public QTextEngine {
+ public:
+-    enum { MemSize = 256*40/sizeof(void *) };
++    enum { MemSize = 256 * 64 / sizeof(void *) };
+     QStackTextEngine(const QString &string, const QFont &f);
+     LayoutData _layoutData;
+     void *_memory[MemSize];
+ };
++
+ Q_DECLARE_TYPEINFO(QTextEngine::ItemDecoration, Q_RELOCATABLE_TYPE);
+ 
+ struct QTextLineItemIterator
+ {
+     QTextLineItemIterator(QTextEngine *eng, int lineNum, const QPointF &pos = QPointF(),
+                           const QTextLayout::FormatRange *_selection = nullptr);
+ 
+     inline bool atEnd() const { return logicalItem >= nItems - 1; }
+     inline bool atBeginning() const { return logicalItem <= 0; }
+     QScriptItem &next();
+ 
+     bool getSelectionBounds(QFixed *selectionX, QFixed *selectionWidth) const;
+     inline bool isOutsideSelection() const {
+         QFixed tmp1, tmp2;
+         return !getSelectionBounds(&tmp1, &tmp2);
+     }
+--- qtbase/src/corelib/thread/qatomic_cxx11.h	2024-05-08 05:42:08.000000000 -0400
++++ qtbase/src/corelib/thread/qatomic_cxx11.h	2024-06-04 16:18:30.000000000 -0400
+@@ -174,291 +174,291 @@
+ #    define Q_ATOMIC_INT64_TEST_AND_SET_IS_NEVER_NATIVE
+ #    define Q_ATOMIC_INT64_FETCH_AND_STORE_IS_NEVER_NATIVE
+ #    define Q_ATOMIC_INT64_FETCH_AND_ADD_IS_NEVER_NATIVE
+ 
+ template <> inline bool QAtomicTraits<8>::isLockFree()
+ { return false; }
+ #  endif
+ #endif
+ 
+ template <typename X> struct QAtomicOps
+ {
+     typedef std::atomic<X> Type;
+ 
+     template <typename T> static inline
+     T load(const std::atomic<T> &_q_value) noexcept
+     {
+-        return _q_value.load(std::memory_order_relaxed);
++        return _q_value.load(std::memory_order_seq_cst);
+     }
+ 
+     template <typename T> static inline
+     T load(const volatile std::atomic<T> &_q_value) noexcept
+     {
+-        return _q_value.load(std::memory_order_relaxed);
++        return _q_value.load(std::memory_order_seq_cst);
+     }
+ 
+     template <typename T> static inline
+     T loadRelaxed(const std::atomic<T> &_q_value) noexcept
+     {
+-        return _q_value.load(std::memory_order_relaxed);
++        return _q_value.load(std::memory_order_seq_cst);
+     }
+ 
+     template <typename T> static inline
+     T loadRelaxed(const volatile std::atomic<T> &_q_value) noexcept
+     {
+-        return _q_value.load(std::memory_order_relaxed);
++        return _q_value.load(std::memory_order_seq_cst);
+     }
+ 
+     template <typename T> static inline
+     T loadAcquire(const std::atomic<T> &_q_value) noexcept
+     {
+-        return _q_value.load(std::memory_order_acquire);
++        return _q_value.load(std::memory_order_seq_cst);
+     }
+ 
+     template <typename T> static inline
+     T loadAcquire(const volatile std::atomic<T> &_q_value) noexcept
+     {
+-        return _q_value.load(std::memory_order_acquire);
++        return _q_value.load(std::memory_order_seq_cst);
+     }
+ 
+     template <typename T> static inline
+     void store(std::atomic<T> &_q_value, T newValue) noexcept
+     {
+-        _q_value.store(newValue, std::memory_order_relaxed);
++        _q_value.store(newValue, std::memory_order_seq_cst);
+     }
+ 
+     template <typename T> static inline
+     void storeRelaxed(std::atomic<T> &_q_value, T newValue) noexcept
+     {
+-        _q_value.store(newValue, std::memory_order_relaxed);
++        _q_value.store(newValue, std::memory_order_seq_cst);
+     }
+ 
+     template <typename T> static inline
+     void storeRelease(std::atomic<T> &_q_value, T newValue) noexcept
+     {
+-        _q_value.store(newValue, std::memory_order_release);
++        _q_value.store(newValue, std::memory_order_seq_cst);
+     }
+ 
+     static inline bool isReferenceCountingNative() noexcept { return isTestAndSetNative(); }
+     static inline constexpr bool isReferenceCountingWaitFree() noexcept { return false; }
+     template <typename T>
+     static inline bool ref(std::atomic<T> &_q_value)
+     {
+         /* Conceptually, we want to
+          *    return ++_q_value != 0;
+          * However, that would be sequentially consistent, and thus stronger
+          * than what we need. Based on
+          * http://eel.is/c++draft/atomics.types.memop#6, we know that
+          * pre-increment is equivalent to fetch_add(1) + 1. Unlike
+          * pre-increment, fetch_add takes a memory order argument, so we can get
+          * the desired acquire-release semantics.
+          * One last gotcha is that fetch_add(1) + 1 would need to be converted
+          * back to T, because it's susceptible to integer promotion. To sidestep
+          * this issue and to avoid UB on signed overflow, we rewrite the
+          * expression to:
+          */
+-        return _q_value.fetch_add(1, std::memory_order_acq_rel) != T(-1);
++        return _q_value.fetch_add(1, std::memory_order_seq_cst) != T(-1);
+     }
+ 
+     template <typename T>
+     static inline bool deref(std::atomic<T> &_q_value) noexcept
+     {
+         // compare with ref
+-        return _q_value.fetch_sub(1, std::memory_order_acq_rel) != T(1);
++        return _q_value.fetch_sub(1, std::memory_order_seq_cst) != T(1);
+     }
+ 
+     static inline bool isTestAndSetNative() noexcept
+     { return QAtomicTraits<sizeof(X)>::isLockFree(); }
+     static inline constexpr bool isTestAndSetWaitFree() noexcept { return false; }
+ 
+     template <typename T>
+     static bool testAndSetRelaxed(std::atomic<T> &_q_value, T expectedValue, T newValue, T *currentValue = nullptr) noexcept
+     {
+-        bool tmp = _q_value.compare_exchange_strong(expectedValue, newValue, std::memory_order_relaxed, std::memory_order_relaxed);
++        bool tmp = _q_value.compare_exchange_strong(expectedValue, newValue, std::memory_order_seq_cst, std::memory_order_seq_cst);
+         if (currentValue)
+             *currentValue = expectedValue;
+         return tmp;
+     }
+ 
+     template <typename T>
+     static bool testAndSetAcquire(std::atomic<T> &_q_value, T expectedValue, T newValue, T *currentValue = nullptr) noexcept
+     {
+-        bool tmp = _q_value.compare_exchange_strong(expectedValue, newValue, std::memory_order_acquire, std::memory_order_acquire);
++        bool tmp = _q_value.compare_exchange_strong(expectedValue, newValue, std::memory_order_seq_cst, std::memory_order_seq_cst);
+         if (currentValue)
+             *currentValue = expectedValue;
+         return tmp;
+     }
+ 
+     template <typename T>
+     static bool testAndSetRelease(std::atomic<T> &_q_value, T expectedValue, T newValue, T *currentValue = nullptr) noexcept
+     {
+-        bool tmp = _q_value.compare_exchange_strong(expectedValue, newValue, std::memory_order_release, std::memory_order_relaxed);
++        bool tmp = _q_value.compare_exchange_strong(expectedValue, newValue, std::memory_order_seq_cst, std::memory_order_seq_cst);
+         if (currentValue)
+             *currentValue = expectedValue;
+         return tmp;
+     }
+ 
+     template <typename T>
+     static bool testAndSetOrdered(std::atomic<T> &_q_value, T expectedValue, T newValue, T *currentValue = nullptr) noexcept
+     {
+-        bool tmp = _q_value.compare_exchange_strong(expectedValue, newValue, std::memory_order_acq_rel, std::memory_order_acquire);
++        bool tmp = _q_value.compare_exchange_strong(expectedValue, newValue, std::memory_order_seq_cst, std::memory_order_seq_cst);
+         if (currentValue)
+             *currentValue = expectedValue;
+         return tmp;
+     }
+ 
+     static inline bool isFetchAndStoreNative() noexcept { return isTestAndSetNative(); }
+     static inline constexpr bool isFetchAndStoreWaitFree() noexcept { return false; }
+ 
+     template <typename T>
+     static T fetchAndStoreRelaxed(std::atomic<T> &_q_value, T newValue) noexcept
+     {
+-        return _q_value.exchange(newValue, std::memory_order_relaxed);
++        return _q_value.exchange(newValue, std::memory_order_seq_cst);
+     }
+ 
+     template <typename T>
+     static T fetchAndStoreAcquire(std::atomic<T> &_q_value, T newValue) noexcept
+     {
+-        return _q_value.exchange(newValue, std::memory_order_acquire);
++        return _q_value.exchange(newValue, std::memory_order_seq_cst);
+     }
+ 
+     template <typename T>
+     static T fetchAndStoreRelease(std::atomic<T> &_q_value, T newValue) noexcept
+     {
+-        return _q_value.exchange(newValue, std::memory_order_release);
++        return _q_value.exchange(newValue, std::memory_order_seq_cst);
+     }
+ 
+     template <typename T>
+     static T fetchAndStoreOrdered(std::atomic<T> &_q_value, T newValue) noexcept
+     {
+-        return _q_value.exchange(newValue, std::memory_order_acq_rel);
++        return _q_value.exchange(newValue, std::memory_order_seq_cst);
+     }
+ 
+     static inline bool isFetchAndAddNative() noexcept { return isTestAndSetNative(); }
+     static inline constexpr bool isFetchAndAddWaitFree() noexcept { return false; }
+ 
+     template <typename T> static inline
+     T fetchAndAddRelaxed(std::atomic<T> &_q_value, typename QAtomicAdditiveType<T>::AdditiveT valueToAdd) noexcept
+     {
+-        return _q_value.fetch_add(valueToAdd, std::memory_order_relaxed);
++        return _q_value.fetch_add(valueToAdd, std::memory_order_seq_cst);
+     }
+ 
+     template <typename T> static inline
+     T fetchAndAddAcquire(std::atomic<T> &_q_value, typename QAtomicAdditiveType<T>::AdditiveT valueToAdd) noexcept
+     {
+-        return _q_value.fetch_add(valueToAdd, std::memory_order_acquire);
++        return _q_value.fetch_add(valueToAdd, std::memory_order_seq_cst);
+     }
+ 
+     template <typename T> static inline
+     T fetchAndAddRelease(std::atomic<T> &_q_value, typename QAtomicAdditiveType<T>::AdditiveT valueToAdd) noexcept
+     {
+-        return _q_value.fetch_add(valueToAdd, std::memory_order_release);
++        return _q_value.fetch_add(valueToAdd, std::memory_order_seq_cst);
+     }
+ 
+     template <typename T> static inline
+     T fetchAndAddOrdered(std::atomic<T> &_q_value, typename QAtomicAdditiveType<T>::AdditiveT valueToAdd) noexcept
+     {
+-        return _q_value.fetch_add(valueToAdd, std::memory_order_acq_rel);
++        return _q_value.fetch_add(valueToAdd, std::memory_order_seq_cst);
+     }
+ 
+     template <typename T> static inline
+     T fetchAndSubRelaxed(std::atomic<T> &_q_value, typename QAtomicAdditiveType<T>::AdditiveT valueToAdd) noexcept
+     {
+-        return _q_value.fetch_sub(valueToAdd, std::memory_order_relaxed);
++        return _q_value.fetch_sub(valueToAdd, std::memory_order_seq_cst);
+     }
+ 
+     template <typename T> static inline
+     T fetchAndSubAcquire(std::atomic<T> &_q_value, typename QAtomicAdditiveType<T>::AdditiveT valueToAdd) noexcept
+     {
+-        return _q_value.fetch_sub(valueToAdd, std::memory_order_acquire);
++        return _q_value.fetch_sub(valueToAdd, std::memory_order_seq_cst);
+     }
+ 
+     template <typename T> static inline
+     T fetchAndSubRelease(std::atomic<T> &_q_value, typename QAtomicAdditiveType<T>::AdditiveT valueToAdd) noexcept
+     {
+-        return _q_value.fetch_sub(valueToAdd, std::memory_order_release);
++        return _q_value.fetch_sub(valueToAdd, std::memory_order_seq_cst);
+     }
+ 
+     template <typename T> static inline
+     T fetchAndSubOrdered(std::atomic<T> &_q_value, typename QAtomicAdditiveType<T>::AdditiveT valueToAdd) noexcept
+     {
+-        return _q_value.fetch_sub(valueToAdd, std::memory_order_acq_rel);
++        return _q_value.fetch_sub(valueToAdd, std::memory_order_seq_cst);
+     }
+ 
+     template <typename T> static inline
+     T fetchAndAndRelaxed(std::atomic<T> &_q_value, typename QAtomicAdditiveType<T>::AdditiveT valueToAdd) noexcept
+     {
+-        return _q_value.fetch_and(valueToAdd, std::memory_order_relaxed);
++        return _q_value.fetch_and(valueToAdd, std::memory_order_seq_cst);
+     }
+ 
+     template <typename T> static inline
+     T fetchAndAndAcquire(std::atomic<T> &_q_value, typename QAtomicAdditiveType<T>::AdditiveT valueToAdd) noexcept
+     {
+-        return _q_value.fetch_and(valueToAdd, std::memory_order_acquire);
++        return _q_value.fetch_and(valueToAdd, std::memory_order_seq_cst);
+     }
+ 
+     template <typename T> static inline
+     T fetchAndAndRelease(std::atomic<T> &_q_value, typename QAtomicAdditiveType<T>::AdditiveT valueToAdd) noexcept
+     {
+-        return _q_value.fetch_and(valueToAdd, std::memory_order_release);
++        return _q_value.fetch_and(valueToAdd, std::memory_order_seq_cst);
+     }
+ 
+     template <typename T> static inline
+     T fetchAndAndOrdered(std::atomic<T> &_q_value, typename QAtomicAdditiveType<T>::AdditiveT valueToAdd) noexcept
+     {
+-        return _q_value.fetch_and(valueToAdd, std::memory_order_acq_rel);
++        return _q_value.fetch_and(valueToAdd, std::memory_order_seq_cst);
+     }
+ 
+     template <typename T> static inline
+     T fetchAndOrRelaxed(std::atomic<T> &_q_value, typename QAtomicAdditiveType<T>::AdditiveT valueToAdd) noexcept
+     {
+-        return _q_value.fetch_or(valueToAdd, std::memory_order_relaxed);
++        return _q_value.fetch_or(valueToAdd, std::memory_order_seq_cst);
+     }
+ 
+     template <typename T> static inline
+     T fetchAndOrAcquire(std::atomic<T> &_q_value, typename QAtomicAdditiveType<T>::AdditiveT valueToAdd) noexcept
+     {
+-        return _q_value.fetch_or(valueToAdd, std::memory_order_acquire);
++        return _q_value.fetch_or(valueToAdd, std::memory_order_seq_cst);
+     }
+ 
+     template <typename T> static inline
+     T fetchAndOrRelease(std::atomic<T> &_q_value, typename QAtomicAdditiveType<T>::AdditiveT valueToAdd) noexcept
+     {
+-        return _q_value.fetch_or(valueToAdd, std::memory_order_release);
++        return _q_value.fetch_or(valueToAdd, std::memory_order_seq_cst);
+     }
+ 
+     template <typename T> static inline
+     T fetchAndOrOrdered(std::atomic<T> &_q_value, typename QAtomicAdditiveType<T>::AdditiveT valueToAdd) noexcept
+     {
+-        return _q_value.fetch_or(valueToAdd, std::memory_order_acq_rel);
++        return _q_value.fetch_or(valueToAdd, std::memory_order_seq_cst);
+     }
+ 
+     template <typename T> static inline
+     T fetchAndXorRelaxed(std::atomic<T> &_q_value, typename QAtomicAdditiveType<T>::AdditiveT valueToAdd) noexcept
+     {
+-        return _q_value.fetch_xor(valueToAdd, std::memory_order_relaxed);
++        return _q_value.fetch_xor(valueToAdd, std::memory_order_seq_cst);
+     }
+ 
+     template <typename T> static inline
+     T fetchAndXorAcquire(std::atomic<T> &_q_value, typename QAtomicAdditiveType<T>::AdditiveT valueToAdd) noexcept
+     {
+-        return _q_value.fetch_xor(valueToAdd, std::memory_order_acquire);
++        return _q_value.fetch_xor(valueToAdd, std::memory_order_seq_cst);
+     }
+ 
+     template <typename T> static inline
+     T fetchAndXorRelease(std::atomic<T> &_q_value, typename QAtomicAdditiveType<T>::AdditiveT valueToAdd) noexcept
+     {
+-        return _q_value.fetch_xor(valueToAdd, std::memory_order_release);
++        return _q_value.fetch_xor(valueToAdd, std::memory_order_seq_cst);
+     }
+ 
+     template <typename T> static inline
+     T fetchAndXorOrdered(std::atomic<T> &_q_value, typename QAtomicAdditiveType<T>::AdditiveT valueToAdd) noexcept
+     {
+-        return _q_value.fetch_xor(valueToAdd, std::memory_order_acq_rel);
++        return _q_value.fetch_xor(valueToAdd, std::memory_order_seq_cst);
+     }
+ };
+ 
+ #  define Q_BASIC_ATOMIC_INITIALIZER(a)     { a }
+ 
+ QT_END_NAMESPACE
+ 
+ #endif // QATOMIC_CXX0X_H
+--- qtbase/src/corelib/thread/qmutex.h	2024-05-08 05:42:08.000000000 -0400
++++ qtbase/src/corelib/thread/qmutex.h	2024-06-07 11:15:42.514030914 -0400
+@@ -1,29 +1,41 @@
+ // Copyright (C) 2016 The Qt Company Ltd.
+ // SPDX-License-Identifier: LicenseRef-Qt-Commercial OR LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only
+ 
+ #ifndef QMUTEX_H
+ #define QMUTEX_H
+ 
+ #include <QtCore/qglobal.h>
+ #include <QtCore/qatomic.h>
+ #include <QtCore/qdeadlinetimer.h>
+ #include <QtCore/qtsan_impl.h>
+ 
+ #include <chrono>
+ 
++#if defined(__cplusplus) && (__cplusplus >= 201703L)
++#  ifndef Q_NODISCARD_CTOR
++#    define Q_NODISCARD_CTOR [[nodiscard]]
++#  endif
++#  ifndef Q_NODISCARD_X
++#    define Q_NODISCARD_X(message) [[nodiscard(message)]]
++#  endif
++#  ifndef Q_NODISCARD_CTOR_X
++#    define Q_NODISCARD_CTOR_X(message) [[nodiscard(message)]]
++#  endif
++#endif // __cplusplus
++
+ QT_BEGIN_NAMESPACE
+ 
+ #if QT_CONFIG(thread) || defined(Q_QDOC)
+ 
+ #if defined(Q_OS_LINUX) || defined(Q_OS_WIN) // these platforms use futex
+ # define QT_MUTEX_LOCK_NOEXCEPT noexcept
+ #else
+ # define QT_MUTEX_LOCK_NOEXCEPT
+ #endif
+ 
+ class QMutex;
+ class QRecursiveMutex;
+ class QMutexPrivate;
+ 
+ class Q_CORE_EXPORT QBasicMutex
+ {
+--- qtbase/src/corelib/text/qstring.cpp	2024-05-08 05:42:08.000000000 -0400
++++ qtbase/src/corelib/text/qstring.cpp	2024-06-09 16:58:16.706045969 -0400
+@@ -378,34 +378,34 @@
+  * 16-byte boundaries if the system malloc() returns 16-byte aligned pointers
+  * on its own (64-bit glibc on Linux does; 32-bit glibc on Linux returns them
+  * 50% of the time), so skipping the alignment prologue is actually optimizing
+  * for the common case.
+  */
+ 
+ #if defined(__mips_dsp)
+ // From qstring_mips_dsp_asm.S
+ extern "C" void qt_fromlatin1_mips_asm_unroll4 (char16_t*, const char*, uint);
+ extern "C" void qt_fromlatin1_mips_asm_unroll8 (char16_t*, const char*, uint);
+ extern "C" void qt_toLatin1_mips_dsp_asm(uchar *dst, const char16_t *src, int length);
+ #endif
+ 
+ #if defined(__SSE2__) && defined(Q_CC_GNU)
+ // We may overrun the buffer, but that's a false positive:
+ // this won't crash nor produce incorrect results
+-#  define ATTRIBUTE_NO_SANITIZE       __attribute__((__no_sanitize_address__))
+-#else
++// No, it crashes, and it produces true positives.
++// Hiding it under the couch doesn't make it go away.
+ #  define ATTRIBUTE_NO_SANITIZE
+ #endif
+ 
+ #ifdef __SSE2__
+ static constexpr bool UseSse4_1 = bool(qCompilerCpuFeatures & CpuFeatureSSE4_1);
+ static constexpr bool UseAvx2 = UseSse4_1 &&
+         (qCompilerCpuFeatures & CpuFeatureArchHaswell) == CpuFeatureArchHaswell;
+ 
+ [[maybe_unused]]
+ static Q_ALWAYS_INLINE __m128i mm_load8_zero_extend(const void *ptr)
+ {
+     const __m128i *dataptr = static_cast<const __m128i *>(ptr);
+     if constexpr (UseSse4_1) {
+         // use a MOVQ followed by PMOVZXBW
+         // if AVX2 is present, these should combine into a single VPMOVZXBW instruction
+         __m128i data = _mm_loadl_epi64(dataptr);
+@@ -447,32 +447,33 @@
+     do {
+         size += Step;
+         data = _mm_load_si128(reinterpret_cast<const __m128i *>(str + size));
+ 
+         comparison = _mm_cmpeq_epi16(data, zeroes);
+         mask = _mm_movemask_epi8(comparison);
+     } while (mask == 0);
+ 
+     // found a null
+     return size + qCountTrailingZeroBits(mask) / sizeof(char16_t);
+ }
+ 
+ // Scans from \a ptr to \a end until \a maskval is non-zero. Returns true if
+ // the no non-zero was found. Returns false and updates \a ptr to point to the
+ // first 16-bit word that has any bit set (note: if the input is 8-bit, \a ptr
+ // may be updated to one byte short).
++[[maybe_ununsed]]
+ static bool simdTestMask(const char *&ptr, const char *end, quint32 maskval)
+ {
+     auto updatePtr = [&](uint result) {
+         // found a character matching the mask
+         uint idx = qCountTrailingZeroBits(~result);
+         ptr += idx;
+         return false;
+     };
+ 
+     if constexpr (UseSse4_1) {
+ #  ifndef Q_OS_QNX              // compiler fails in the code below
+         __m128i mask;
+         auto updatePtrSimd = [&](__m128i data) -> bool {
+             __m128i masked = _mm_and_si128(mask, data);
+             __m128i comparison = _mm_cmpeq_epi16(masked, _mm_setzero_si128());
+             uint result = _mm_movemask_epi8(comparison);
+@@ -674,498 +675,171 @@
+     } else {
+         // reset l
+         l &= 3;
+ 
+         const auto lambda = [=](size_t i) -> int {
+             return a[i] - b[i];
+         };
+         return UnrollTailLoop<3>::exec(l, 0, lambda, lambda);
+     }
+     return 0;
+ }
+ #endif
+ 
+ Q_NEVER_INLINE
+ qsizetype QtPrivate::qustrlen(const char16_t *str) noexcept
+ {
+-#if defined(__SSE2__) && !(defined(__SANITIZE_ADDRESS__) || __has_feature(address_sanitizer))
+-    return qustrlen_sse2(str);
+-#endif
+-
+     if (sizeof(wchar_t) == sizeof(char16_t))
+         return wcslen(reinterpret_cast<const wchar_t *>(str));
+ 
+     qsizetype result = 0;
+     while (*str++)
+         ++result;
+     return result;
+ }
+ 
+ qsizetype QtPrivate::qustrnlen(const char16_t *str, qsizetype maxlen) noexcept
+ {
+     return qustrchr({ str, maxlen }, u'\0') - str;
+ }
+ 
+ /*!
+  * \internal
+  *
+  * Searches for character \a c in the string \a str and returns a pointer to
+  * it. Unlike strchr() and wcschr() (but like glibc's strchrnul()), if the
+  * character is not found, this function returns a pointer to the end of the
+  * string -- that is, \c{str.end()}.
+  */
+ Q_NEVER_INLINE
+ const char16_t *QtPrivate::qustrchr(QStringView str, char16_t c) noexcept
+ {
+     const char16_t *n = str.utf16();
+     const char16_t *e = n + str.size();
+-
+-#ifdef __SSE2__
+-    bool loops = true;
+-    // Using the PMOVMSKB instruction, we get two bits for each character
+-    // we compare.
+-    __m128i mch;
+-    if constexpr (UseAvx2) {
+-        // we're going to read n[0..15] (32 bytes)
+-        __m256i mch256 = _mm256_set1_epi32(c | (c << 16));
+-        for (const char16_t *next = n + 16; next <= e; n = next, next += 16) {
+-            __m256i data = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(n));
+-            __m256i result = _mm256_cmpeq_epi16(data, mch256);
+-            uint mask = uint(_mm256_movemask_epi8(result));
+-            if (mask) {
+-                uint idx = qCountTrailingZeroBits(mask);
+-                return n + idx / 2;
+-            }
+-        }
+-        loops = false;
+-        mch = _mm256_castsi256_si128(mch256);
+-    } else {
+-        mch = _mm_set1_epi32(c | (c << 16));
+-    }
+-
+-    auto hasMatch = [mch, &n](__m128i data, ushort validityMask) {
+-        __m128i result = _mm_cmpeq_epi16(data, mch);
+-        uint mask = uint(_mm_movemask_epi8(result));
+-        if ((mask & validityMask) == 0)
+-            return false;
+-        uint idx = qCountTrailingZeroBits(mask);
+-        n += idx / 2;
+-        return true;
+-    };
+-
+-    // we're going to read n[0..7] (16 bytes)
+-    for (const char16_t *next = n + 8; next <= e; n = next, next += 8) {
+-        __m128i data = _mm_loadu_si128(reinterpret_cast<const __m128i *>(n));
+-        if (hasMatch(data, 0xffff))
+-            return n;
+-
+-        if (!loops) {
+-            n += 8;
+-            break;
+-        }
+-    }
+-
+-#  if !defined(__OPTIMIZE_SIZE__)
+-    // we're going to read n[0..3] (8 bytes)
+-    if (e - n > 3) {
+-        __m128i data = _mm_loadl_epi64(reinterpret_cast<const __m128i *>(n));
+-        if (hasMatch(data, 0xff))
+-            return n;
+-
+-        n += 4;
+-    }
+-
+-    return UnrollTailLoop<3>::exec(e - n, e,
+-                                   [=](qsizetype i) { return n[i] == c; },
+-                                   [=](qsizetype i) { return n + i; });
+-#  endif
+-#elif defined(__ARM_NEON__)
+-    const uint16x8_t vmask = { 1, 1 << 1, 1 << 2, 1 << 3, 1 << 4, 1 << 5, 1 << 6, 1 << 7 };
+-    const uint16x8_t ch_vec = vdupq_n_u16(c);
+-    for (const char16_t *next = n + 8; next <= e; n = next, next += 8) {
+-        uint16x8_t data = vld1q_u16(reinterpret_cast<const uint16_t *>(n));
+-        uint mask = vaddvq_u16(vandq_u16(vceqq_u16(data, ch_vec), vmask));
+-        if (ushort(mask)) {
+-            // found a match
+-            return n + qCountTrailingZeroBits(mask);
+-        }
+-    }
+-#endif // aarch64
+-
+     return std::find(n, e, c);
+ }
+ 
+ // Note: ptr on output may be off by one and point to a preceding US-ASCII
+ // character. Usually harmless.
+ bool qt_is_ascii(const char *&ptr, const char *end) noexcept
+ {
+-#if defined(__SSE2__)
+-    // Testing for the high bit can be done efficiently with just PMOVMSKB
+-    bool loops = true;
+-    if constexpr (UseAvx2) {
+-        while (ptr + 32 <= end) {
+-            __m256i data = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(ptr));
+-            quint32 mask = _mm256_movemask_epi8(data);
+-            if (mask) {
+-                uint idx = qCountTrailingZeroBits(mask);
+-                ptr += idx;
+-                return false;
+-            }
+-            ptr += 32;
+-        }
+-        loops = false;
+-    }
+-
+-    while (ptr + 16 <= end) {
+-        __m128i data = _mm_loadu_si128(reinterpret_cast<const __m128i *>(ptr));
+-        quint32 mask = _mm_movemask_epi8(data);
+-        if (mask) {
+-            uint idx = qCountTrailingZeroBits(mask);
+-            ptr += idx;
+-            return false;
+-        }
+-        ptr += 16;
+-
+-        if (!loops)
+-            break;
+-    }
+-    if (ptr + 8 <= end) {
+-        __m128i data = _mm_loadl_epi64(reinterpret_cast<const __m128i *>(ptr));
+-        quint8 mask = _mm_movemask_epi8(data);
+-        if (mask) {
+-            uint idx = qCountTrailingZeroBits(mask);
+-            ptr += idx;
+-            return false;
+-        }
+-        ptr += 8;
+-    }
+-#endif
+-
+     while (ptr + 4 <= end) {
+         quint32 data = qFromUnaligned<quint32>(ptr);
+         if (data &= 0x80808080U) {
+             uint idx = QSysInfo::ByteOrder == QSysInfo::BigEndian
+                     ? qCountLeadingZeroBits(data)
+                     : qCountTrailingZeroBits(data);
+             ptr += idx / 8;
+             return false;
+         }
+         ptr += 4;
+     }
+ 
+     while (ptr != end) {
+         if (quint8(*ptr) & 0x80)
+             return false;
+         ++ptr;
+     }
+     return true;
+ }
+ 
+ bool QtPrivate::isAscii(QLatin1StringView s) noexcept
+ {
+     const char *ptr = s.begin();
+     const char *end = s.end();
+ 
+     return qt_is_ascii(ptr, end);
+ }
+ 
+ static bool isAscii_helper(const char16_t *&ptr, const char16_t *end)
+ {
+-#ifdef __SSE2__
+-    const char *ptr8 = reinterpret_cast<const char *>(ptr);
+-    const char *end8 = reinterpret_cast<const char *>(end);
+-    bool ok = simdTestMask(ptr8, end8, 0xff80ff80);
+-    ptr = reinterpret_cast<const char16_t *>(ptr8);
+-    if (!ok)
+-        return false;
+-#endif
+-
+     while (ptr != end) {
+         if (*ptr & 0xff80)
+             return false;
+         ++ptr;
+     }
+     return true;
+ }
+ 
+ bool QtPrivate::isAscii(QStringView s) noexcept
+ {
+     const char16_t *ptr = s.utf16();
+     const char16_t *end = ptr + s.size();
+ 
+     return isAscii_helper(ptr, end);
+ }
+ 
+ bool QtPrivate::isLatin1(QStringView s) noexcept
+ {
+     const char16_t *ptr = s.utf16();
+     const char16_t *end = ptr + s.size();
+ 
+-#ifdef __SSE2__
+-    const char *ptr8 = reinterpret_cast<const char *>(ptr);
+-    const char *end8 = reinterpret_cast<const char *>(end);
+-    if (!simdTestMask(ptr8, end8, 0xff00ff00))
+-        return false;
+-    ptr = reinterpret_cast<const char16_t *>(ptr8);
+-#endif
+-
+     while (ptr != end) {
+         if (*ptr++ > 0xff)
+             return false;
+     }
+     return true;
+ }
+ 
+ bool QtPrivate::isValidUtf16(QStringView s) noexcept
+ {
+     constexpr char32_t InvalidCodePoint = UINT_MAX;
+ 
+     QStringIterator i(s);
+     while (i.hasNext()) {
+         const char32_t c = i.next(InvalidCodePoint);
+         if (c == InvalidCodePoint)
+             return false;
+     }
+ 
+     return true;
+ }
+ 
+ // conversion between Latin 1 and UTF-16
+ Q_CORE_EXPORT void qt_from_latin1(char16_t *dst, const char *str, size_t size) noexcept
+ {
+     /* SIMD:
+      * Unpacking with SSE has been shown to improve performance on recent CPUs
+      * The same method gives no improvement with NEON. On Aarch64, clang will do the vectorization
+      * itself in exactly the same way as one would do it with intrinsics.
+      */
+-#if defined(__SSE2__)
+-    // we're going to read str[offset..offset+15] (16 bytes)
+-    const __m128i nullMask = _mm_setzero_si128();
+-    auto processOneChunk = [=](qptrdiff offset) {
+-        const __m128i chunk = _mm_loadu_si128((const __m128i*)(str + offset)); // load
+-        if constexpr (UseAvx2) {
+-            // zero extend to an YMM register
+-            const __m256i extended = _mm256_cvtepu8_epi16(chunk);
+-
+-            // store
+-            _mm256_storeu_si256((__m256i*)(dst + offset), extended);
+-        } else {
+-            // unpack the first 8 bytes, padding with zeros
+-            const __m128i firstHalf = _mm_unpacklo_epi8(chunk, nullMask);
+-            _mm_storeu_si128((__m128i*)(dst + offset), firstHalf); // store
+-
+-            // unpack the last 8 bytes, padding with zeros
+-            const __m128i secondHalf = _mm_unpackhi_epi8 (chunk, nullMask);
+-            _mm_storeu_si128((__m128i*)(dst + offset + 8), secondHalf); // store
+-        }
+-    };
+-
+-    const char *e = str + size;
+-    if (size >= sizeof(__m128i)) {
+-        qptrdiff offset = 0;
+-        for ( ; str + offset + sizeof(__m128i) <= e; offset += sizeof(__m128i))
+-            processOneChunk(offset);
+-        if (str + offset < e)
+-            processOneChunk(size - sizeof(__m128i));
+-        return;
+-    }
+-
+-#  if !defined(__OPTIMIZE_SIZE__)
+-    if (size >= 4) {
+-        // two overlapped loads & stores, of either 64-bit or of 32-bit
+-        if (size >= 8) {
+-            const __m128i unpacked1 = mm_load8_zero_extend(str);
+-            const __m128i unpacked2 = mm_load8_zero_extend(str + size - 8);
+-            _mm_storeu_si128(reinterpret_cast<__m128i *>(dst), unpacked1);
+-            _mm_storeu_si128(reinterpret_cast<__m128i *>(dst + size -  8), unpacked2);
+-        } else {
+-            const __m128i chunk1 = _mm_cvtsi32_si128(qFromUnaligned<quint32>(str));
+-            const __m128i chunk2 = _mm_cvtsi32_si128(qFromUnaligned<quint32>(str + size - 4));
+-            const __m128i unpacked1 = _mm_unpacklo_epi8(chunk1, nullMask);
+-            const __m128i unpacked2 = _mm_unpacklo_epi8(chunk2, nullMask);
+-            _mm_storel_epi64(reinterpret_cast<__m128i *>(dst), unpacked1);
+-            _mm_storel_epi64(reinterpret_cast<__m128i *>(dst + size - 4), unpacked2);
+-        }
+-        return;
+-    } else {
+-        size = size % 4;
+-        return UnrollTailLoop<3>::exec(qsizetype(size), [=](qsizetype i) { dst[i] = uchar(str[i]); });
+-    }
+-#  endif
+-#endif
+ #if defined(__mips_dsp)
+     static_assert(sizeof(qsizetype) == sizeof(int),
+                   "oops, the assembler implementation needs to be called in a loop");
+     if (size > 20)
+         qt_fromlatin1_mips_asm_unroll8(dst, str, size);
+     else
+         qt_fromlatin1_mips_asm_unroll4(dst, str, size);
+ #else
+     while (size--)
+         *dst++ = (uchar)*str++;
+ #endif
+ }
+ 
+ static QVarLengthArray<char16_t> qt_from_latin1_to_qvla(QLatin1StringView str)
+ {
+     const qsizetype len = str.size();
+     QVarLengthArray<char16_t> arr(len);
+     qt_from_latin1(arr.data(), str.data(), len);
+     return arr;
+ }
+ 
+ template <bool Checked>
+ static void qt_to_latin1_internal(uchar *dst, const char16_t *src, qsizetype length)
+ {
+-#if defined(__SSE2__)
+-    auto questionMark256 = []() {
+-        if constexpr (UseAvx2)
+-            return _mm256_broadcastw_epi16(_mm_cvtsi32_si128('?'));
+-        else
+-            return 0;
+-    }();
+-    auto outOfRange256 = []() {
+-        if constexpr (UseAvx2)
+-            return _mm256_broadcastw_epi16(_mm_cvtsi32_si128(0x100));
+-        else
+-            return 0;
+-    }();
+-    __m128i questionMark, outOfRange;
+-    if constexpr (UseAvx2) {
+-        questionMark = _mm256_castsi256_si128(questionMark256);
+-        outOfRange = _mm256_castsi256_si128(outOfRange256);
+-    } else {
+-        questionMark = _mm_set1_epi16('?');
+-        outOfRange = _mm_set1_epi16(0x100);
+-    }
+-
+-    auto mergeQuestionMarks = [=](__m128i chunk) {
+-        if (!Checked)
+-            return chunk;
+-
+-        // SSE has no compare instruction for unsigned comparison.
+-        if constexpr (UseSse4_1) {
+-            // We use an unsigned uc = qMin(uc, 0x100) and then compare for equality.
+-            chunk = _mm_min_epu16(chunk, outOfRange);
+-            const __m128i offLimitMask = _mm_cmpeq_epi16(chunk, outOfRange);
+-            chunk = _mm_blendv_epi8(chunk, questionMark, offLimitMask);
+-            return chunk;
+-        }
+-        // The variables must be shiffted + 0x8000 to be compared
+-        const __m128i signedBitOffset = _mm_set1_epi16(short(0x8000));
+-        const __m128i thresholdMask = _mm_set1_epi16(short(0xff + 0x8000));
+-
+-        const __m128i signedChunk = _mm_add_epi16(chunk, signedBitOffset);
+-        const __m128i offLimitMask = _mm_cmpgt_epi16(signedChunk, thresholdMask);
+-
+-        // offLimitQuestionMark contains '?' for each 16 bits that was off-limit
+-        // the 16 bits that were correct contains zeros
+-        const __m128i offLimitQuestionMark = _mm_and_si128(offLimitMask, questionMark);
+-
+-        // correctBytes contains the bytes that were in limit
+-        // the 16 bits that were off limits contains zeros
+-        const __m128i correctBytes = _mm_andnot_si128(offLimitMask, chunk);
+-
+-        // merge offLimitQuestionMark and correctBytes to have the result
+-        chunk = _mm_or_si128(correctBytes, offLimitQuestionMark);
+-
+-        Q_UNUSED(outOfRange);
+-        return chunk;
+-    };
+-
+-    // we're going to read to src[offset..offset+15] (16 bytes)
+-    auto loadChunkAt = [=](qptrdiff offset) {
+-        __m128i chunk1, chunk2;
+-        if constexpr (UseAvx2) {
+-            __m256i chunk = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(src + offset));
+-            if (Checked) {
+-                // See mergeQuestionMarks lambda above for details
+-                chunk = _mm256_min_epu16(chunk, outOfRange256);
+-                const __m256i offLimitMask = _mm256_cmpeq_epi16(chunk, outOfRange256);
+-                chunk = _mm256_blendv_epi8(chunk, questionMark256, offLimitMask);
+-            }
+-
+-            chunk2 = _mm256_extracti128_si256(chunk, 1);
+-            chunk1 = _mm256_castsi256_si128(chunk);
+-        } else {
+-            chunk1 = _mm_loadu_si128((const __m128i*)(src + offset)); // load
+-            chunk1 = mergeQuestionMarks(chunk1);
+-
+-            chunk2 = _mm_loadu_si128((const __m128i*)(src + offset + 8)); // load
+-            chunk2 = mergeQuestionMarks(chunk2);
+-        }
+-
+-        // pack the two vector to 16 x 8bits elements
+-        return _mm_packus_epi16(chunk1, chunk2);
+-    };
+-
+-    if (size_t(length) >= sizeof(__m128i)) {
+-        // because of possible overlapping, we won't process the last chunk in the loop
+-        qptrdiff offset = 0;
+-        for ( ; offset + 2 * sizeof(__m128i) < size_t(length); offset += sizeof(__m128i))
+-            _mm_storeu_si128(reinterpret_cast<__m128i *>(dst + offset), loadChunkAt(offset));
+-
+-        // overlapped conversion of the last full chunk and the tail
+-        __m128i last1 = loadChunkAt(offset);
+-        __m128i last2 = loadChunkAt(length - sizeof(__m128i));
+-        _mm_storeu_si128(reinterpret_cast<__m128i *>(dst + offset), last1);
+-        _mm_storeu_si128(reinterpret_cast<__m128i *>(dst + length - sizeof(__m128i)), last2);
+-        return;
+-    }
+-
+-#  if !defined(__OPTIMIZE_SIZE__)
+-    if (length >= 4) {
+-        // this code is fine even for in-place conversion because we load both
+-        // before any store
+-        if (length >= 8) {
+-            __m128i chunk1 = _mm_loadu_si128(reinterpret_cast<const __m128i *>(src));
+-            __m128i chunk2 = _mm_loadu_si128(reinterpret_cast<const __m128i *>(src + length - 8));
+-            chunk1 = mergeQuestionMarks(chunk1);
+-            chunk2 = mergeQuestionMarks(chunk2);
+-
+-            // pack, where the upper half is ignored
+-            const __m128i result1 = _mm_packus_epi16(chunk1, chunk1);
+-            const __m128i result2 = _mm_packus_epi16(chunk2, chunk2);
+-            _mm_storel_epi64(reinterpret_cast<__m128i *>(dst), result1);
+-            _mm_storel_epi64(reinterpret_cast<__m128i *>(dst + length - 8), result2);
+-        } else {
+-            __m128i chunk1 = _mm_loadl_epi64(reinterpret_cast<const __m128i *>(src));
+-            __m128i chunk2 = _mm_loadl_epi64(reinterpret_cast<const __m128i *>(src + length - 4));
+-            chunk1 = mergeQuestionMarks(chunk1);
+-            chunk2 = mergeQuestionMarks(chunk2);
+-
+-            // pack, we'll zero the upper three quarters
+-            const __m128i result1 = _mm_packus_epi16(chunk1, chunk1);
+-            const __m128i result2 = _mm_packus_epi16(chunk2, chunk2);
+-            qToUnaligned(_mm_cvtsi128_si32(result1), dst);
+-            qToUnaligned(_mm_cvtsi128_si32(result2), dst + length - 4);
+-        }
+-        return;
+-    }
+-
+-    length = length % 4;
+-    return UnrollTailLoop<3>::exec(length, [=](qsizetype i) {
+-        if (Checked)
+-            dst[i] = (src[i]>0xff) ? '?' : (uchar) src[i];
+-        else
+-            dst[i] = src[i];
+-    });
+-#  else
+-    length = length % 16;
+-#  endif // optimize size
+-#elif defined(__ARM_NEON__)
++#if defined(__ARM_NEON__)
+     // Refer to the documentation of the SSE2 implementation.
+     // This uses exactly the same method as for SSE except:
+     // 1) neon has unsigned comparison
+     // 2) packing is done to 64 bits (8 x 8bits component).
+     if (length >= 16) {
+         const qsizetype chunkCount = length >> 3; // divided by 8
+         const uint16x8_t questionMark = vdupq_n_u16('?'); // set
+         const uint16x8_t thresholdMask = vdupq_n_u16(0xff); // set
+         for (qsizetype i = 0; i < chunkCount; ++i) {
+             uint16x8_t chunk = vld1q_u16((uint16_t *)src); // load
+             src += 8;
+ 
+             if (Checked) {
+                 const uint16x8_t offLimitMask = vcgtq_u16(chunk, thresholdMask); // chunk > thresholdMask
+                 const uint16x8_t offLimitQuestionMark = vandq_u16(offLimitMask, questionMark); // offLimitMask & questionMark
+                 const uint16x8_t correctBytes = vbicq_u16(chunk, offLimitMask); // !offLimitMask & chunk
+@@ -1278,90 +952,49 @@
+ }
+ 
+ #if defined(__mips_dsp)
+ // From qstring_mips_dsp_asm.S
+ extern "C" int qt_ucstrncmp_mips_dsp_asm(const char16_t *a,
+                                          const char16_t *b,
+                                          unsigned len);
+ #endif
+ 
+ // Unicode case-sensitive compare two same-sized strings
+ template <StringComparisonMode Mode>
+ static int ucstrncmp(const char16_t *a, const char16_t *b, size_t l)
+ {
+     // This function isn't memcmp() because that can return the wrong sorting
+     // result in little-endian architectures: 0x00ff must sort before 0x0100,
+     // but the bytes in memory are FF 00 and 00 01.
+-
+-#ifndef __OPTIMIZE_SIZE__
+-#  if defined(__mips_dsp)
+-    static_assert(sizeof(uint) == sizeof(size_t));
+-    if (l >= 8) {
+-        return qt_ucstrncmp_mips_dsp_asm(a, b, l);
+-    }
+-#  elif defined(__SSE2__)
+-    return ucstrncmp_sse2<Mode>(a, b, l);
+-#  elif defined(__ARM_NEON__)
+-    if (l >= 8) {
+-        const char16_t *end = a + l;
+-        const uint16x8_t mask = { 1, 1 << 1, 1 << 2, 1 << 3, 1 << 4, 1 << 5, 1 << 6, 1 << 7 };
+-        while (end - a > 7) {
+-            uint16x8_t da = vld1q_u16(reinterpret_cast<const uint16_t *>(a));
+-            uint16x8_t db = vld1q_u16(reinterpret_cast<const uint16_t *>(b));
+-
+-            uint8_t r = ~(uint8_t)vaddvq_u16(vandq_u16(vceqq_u16(da, db), mask));
+-            if (r) {
+-                // found a different QChar
+-                if (Mode == CompareStringsForEquality)
+-                    return 1;
+-                uint idx = qCountTrailingZeroBits(r);
+-                return a[idx] - b[idx];
+-            }
+-            a += 8;
+-            b += 8;
+-        }
+-        l &= 7;
+-    }
+-    const auto lambda = [=](size_t i) -> int {
+-        return a[i] - b[i];
+-    };
+-    return UnrollTailLoop<7>::exec(l, 0, lambda, lambda);
+-#  endif // MIPS DSP or __SSE2__ or __ARM_NEON__
+-#endif // __OPTIMIZE_SIZE__
+-
+     if (Mode == CompareStringsForEquality || QSysInfo::ByteOrder == QSysInfo::BigEndian)
+         return memcmp(a, b, l * sizeof(char16_t));
+ 
+     for (size_t i = 0; i < l; ++i) {
+         if (int diff = a[i] - b[i])
+             return diff;
+     }
+     return 0;
+ }
+ 
+ template <StringComparisonMode Mode>
+ static int ucstrncmp(const char16_t *a, const char *b, size_t l)
+ {
+     const uchar *c = reinterpret_cast<const uchar *>(b);
+     const char16_t *uc = a;
+     const char16_t *e = uc + l;
+ 
+-#if defined(__SSE2__) && !defined(__OPTIMIZE_SIZE__)
+-    return ucstrncmp_sse2<Mode>(uc, c, l);
+-#endif
+-
+     while (uc < e) {
+         int diff = *uc - *c;
+         if (diff)
+             return diff;
+         uc++, c++;
+     }
+ 
+     return 0;
+ }
+ 
+ // Unicode case-sensitive equality
+ template <typename Char2>
+ static bool ucstreq(const char16_t *a, size_t alen, const Char2 *b, size_t blen)
+ {
+     if (alen != blen)
+         return false;
+--- qtbase/src/corelib/text/qbytearray.cpp	2024-05-08 05:42:08.000000000 -0400
++++ qtbase/src/corelib/text/qbytearray.cpp	2024-06-09 10:25:57.697543808 -0400
+@@ -233,76 +233,32 @@
+ 
+     enum { Incomplete = 256 };
+     qptrdiff offset = 0;
+     auto innerCompare = [=, &offset](qptrdiff max, bool unlimited) {
+         max += offset;
+         do {
+             uchar c = s1[offset];
+             if (int res = QtMiscUtils::caseCompareAscii(c, s2[offset]))
+                 return res;
+             if (!c)
+                 return 0;
+             ++offset;
+         } while (unlimited || offset < max);
+         return int(Incomplete);
+     };
+ 
+-#if defined(__SSE4_1__) && !(defined(__SANITIZE_ADDRESS__) || __has_feature(address_sanitizer))
+-    enum { PageSize = 4096, PageMask = PageSize - 1 };
+-    const __m128i zero = _mm_setzero_si128();
+-    forever {
+-        // Calculate how many bytes we can load until we cross a page boundary
+-        // for either source. This isn't an exact calculation, just something
+-        // very quick.
+-        quintptr u1 = quintptr(s1 + offset);
+-        quintptr u2 = quintptr(s2 + offset);
+-        size_t n = PageSize - ((u1 | u2) & PageMask);
+-
+-        qptrdiff maxoffset = offset + n;
+-        for ( ; offset + 16 <= maxoffset; offset += sizeof(__m128i)) {
+-            // load 16 bytes from either source
+-            __m128i a = _mm_loadu_si128(reinterpret_cast<const __m128i *>(s1 + offset));
+-            __m128i b = _mm_loadu_si128(reinterpret_cast<const __m128i *>(s2 + offset));
+-
+-            // compare the two against each other
+-            __m128i cmp = _mm_cmpeq_epi8(a, b);
+-
+-            // find NUL terminators too
+-            cmp = _mm_min_epu8(cmp, a);
+-            cmp = _mm_cmpeq_epi8(cmp, zero);
+-
+-            // was there any difference or a NUL?
+-            uint mask = _mm_movemask_epi8(cmp);
+-            if (mask) {
+-                // yes, find out where
+-                uint start = qCountTrailingZeroBits(mask);
+-                uint end = sizeof(mask) * 8 - qCountLeadingZeroBits(mask);
+-                Q_ASSERT(end >= start);
+-                offset += start;
+-                n = end - start;
+-                break;
+-            }
+-        }
+-
+-        // using SIMD could cause a page fault, so iterate byte by byte
+-        int res = innerCompare(n, false);
+-        if (res != Incomplete)
+-            return res;
+-    }
+-#endif
+-
+     return innerCompare(-1, true);
+ }
+ 
+ /*! \relates QByteArray
+ 
+     A safe \c strnicmp() function.
+ 
+     Compares at most \a len bytes of \a str1 and \a str2, ignoring differences
+     in the case of any ASCII characters.
+ 
+     Returns a negative value if \a str1 is less than \a str2, 0 if \a str1
+     is equal to \a str2 or a positive value if \a str1 is greater than \a
+     str2.
+ 
+     If both strings are \nullptr, they are deemed equal; otherwise, if either is
+     \nullptr, it is treated as less than the other (even if the other is an
+--- qtbase/src/corelib/text/qstringconverter.cpp	2024-05-08 05:42:08.000000000 -0400
++++ qtbase/src/corelib/text/qstringconverter.cpp	2024-06-09 10:41:00.663871335 -0400
+@@ -51,454 +51,70 @@
+ #if defined(__SSE2__) || defined(__ARM_NEON__)
+ static Q_ALWAYS_INLINE uint qBitScanReverse(unsigned v) noexcept
+ {
+ #if defined(__cpp_lib_int_pow2) && __cpp_lib_int_pow2 >= 202002L
+      return std::bit_width(v) - 1;
+ #else
+     uint result = qCountLeadingZeroBits(v);
+     // Now Invert the result: clz will count *down* from the msb to the lsb, so the msb index is 31
+     // and the lsb index is 0. The result for _bit_scan_reverse is expected to be the index when
+     // counting up: msb index is 0 (because it starts there), and the lsb index is 31.
+     result ^= sizeof(unsigned) * 8 - 1;
+     return result;
+ #endif
+ }
+ #endif
+ 
+-#if defined(__SSE2__)
+-static inline bool simdEncodeAscii(uchar *&dst, const char16_t *&nextAscii, const char16_t *&src, const char16_t *end)
++static inline bool simdEncodeAscii(uchar *, const char16_t *, const char16_t *,
++                                   const char16_t *)
+ {
+-    // do sixteen characters at a time
+-    for ( ; end - src >= 16; src += 16, dst += 16) {
+-#  ifdef __AVX2__
+-        __m256i data = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(src));
+-        __m128i data1 = _mm256_castsi256_si128(data);
+-        __m128i data2 = _mm256_extracti128_si256(data, 1);
+-#  else
+-        __m128i data1 = _mm_loadu_si128((const __m128i*)src);
+-        __m128i data2 = _mm_loadu_si128(1+(const __m128i*)src);
+-#  endif
+-
+-        // check if everything is ASCII
+-        // the highest ASCII value is U+007F
+-        // Do the packing directly:
+-        // The PACKUSWB instruction has packs a signed 16-bit integer to an unsigned 8-bit
+-        // with saturation. That is, anything from 0x0100 to 0x7fff is saturated to 0xff,
+-        // while all negatives (0x8000 to 0xffff) get saturated to 0x00. To detect non-ASCII,
+-        // we simply do a signed greater-than comparison to 0x00. That means we detect NULs as
+-        // "non-ASCII", but it's an acceptable compromise.
+-        __m128i packed = _mm_packus_epi16(data1, data2);
+-        __m128i nonAscii = _mm_cmpgt_epi8(packed, _mm_setzero_si128());
+-
+-        // store, even if there are non-ASCII characters here
+-        _mm_storeu_si128((__m128i*)dst, packed);
+-
+-        // n will contain 1 bit set per character in [data1, data2] that is non-ASCII (or NUL)
+-        ushort n = ~_mm_movemask_epi8(nonAscii);
+-        if (n) {
+-            // find the next probable ASCII character
+-            // we don't want to load 32 bytes again in this loop if we know there are non-ASCII
+-            // characters still coming
+-            nextAscii = src + qBitScanReverse(n) + 1;
+-
+-            n = qCountTrailingZeroBits(n);
+-            dst += n;
+-            src += n;
+-            return false;
+-        }
+-    }
+-
+-    if (end - src >= 8) {
+-        // do eight characters at a time
+-        __m128i data = _mm_loadu_si128(reinterpret_cast<const __m128i *>(src));
+-        __m128i packed = _mm_packus_epi16(data, data);
+-        __m128i nonAscii = _mm_cmpgt_epi8(packed, _mm_setzero_si128());
+-
+-        // store even non-ASCII
+-        _mm_storel_epi64(reinterpret_cast<__m128i *>(dst), packed);
+-
+-        uchar n = ~_mm_movemask_epi8(nonAscii);
+-        if (n) {
+-            nextAscii = src + qBitScanReverse(n) + 1;
+-            n = qCountTrailingZeroBits(n);
+-            dst += n;
+-            src += n;
+-            return false;
+-        }
+-    }
+-
+-    return src == end;
+-}
+-
+-static inline bool simdDecodeAscii(char16_t *&dst, const uchar *&nextAscii, const uchar *&src, const uchar *end)
+-{
+-    // do sixteen characters at a time
+-    for ( ; end - src >= 16; src += 16, dst += 16) {
+-        __m128i data = _mm_loadu_si128((const __m128i*)src);
+-
+-#ifdef __AVX2__
+-        const int BitSpacing = 2;
+-        // load and zero extend to an YMM register
+-        const __m256i extended = _mm256_cvtepu8_epi16(data);
+-
+-        uint n = _mm256_movemask_epi8(extended);
+-        if (!n) {
+-            // store
+-            _mm256_storeu_si256((__m256i*)dst, extended);
+-            continue;
+-        }
+-#else
+-        const int BitSpacing = 1;
+-
+-        // check if everything is ASCII
+-        // movemask extracts the high bit of every byte, so n is non-zero if something isn't ASCII
+-        uint n = _mm_movemask_epi8(data);
+-        if (!n) {
+-            // unpack
+-            _mm_storeu_si128((__m128i*)dst, _mm_unpacklo_epi8(data, _mm_setzero_si128()));
+-            _mm_storeu_si128(1+(__m128i*)dst, _mm_unpackhi_epi8(data, _mm_setzero_si128()));
+-            continue;
+-        }
+-#endif
+-
+-        // copy the front part that is still ASCII
+-        while (!(n & 1)) {
+-            *dst++ = *src++;
+-            n >>= BitSpacing;
+-        }
+-
+-        // find the next probable ASCII character
+-        // we don't want to load 16 bytes again in this loop if we know there are non-ASCII
+-        // characters still coming
+-        n = qBitScanReverse(n);
+-        nextAscii = src + (n / BitSpacing) + 1;
+-        return false;
+-
+-    }
+-
+-    if (end - src >= 8) {
+-        __m128i data = _mm_loadl_epi64(reinterpret_cast<const __m128i *>(src));
+-        uint n = _mm_movemask_epi8(data) & 0xff;
+-        if (!n) {
+-            // unpack and store
+-            _mm_storeu_si128(reinterpret_cast<__m128i *>(dst), _mm_unpacklo_epi8(data, _mm_setzero_si128()));
+-        } else {
+-            while (!(n & 1)) {
+-                *dst++ = *src++;
+-                n >>= 1;
+-            }
+-
+-            n = qBitScanReverse(n);
+-            nextAscii = src + n + 1;
+-            return false;
+-        }
+-    }
+-
+-    return src == end;
+-}
+-
+-static inline const uchar *simdFindNonAscii(const uchar *src, const uchar *end, const uchar *&nextAscii)
+-{
+-#ifdef __AVX2__
+-    // do 32 characters at a time
+-    // (this is similar to simdTestMask in qstring.cpp)
+-    const __m256i mask = _mm256_set1_epi8(char(0x80));
+-    for ( ; end - src >= 32; src += 32) {
+-        __m256i data = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(src));
+-        if (_mm256_testz_si256(mask, data))
+-            continue;
+-
+-        uint n = _mm256_movemask_epi8(data);
+-        Q_ASSERT(n);
+-
+-        // find the next probable ASCII character
+-        // we don't want to load 32 bytes again in this loop if we know there are non-ASCII
+-        // characters still coming
+-        nextAscii = src + qBitScanReverse(n) + 1;
+-
+-        // return the non-ASCII character
+-        return src + qCountTrailingZeroBits(n);
+-    }
+-#endif
+-
+-    // do sixteen characters at a time
+-    for ( ; end - src >= 16; src += 16) {
+-        __m128i data = _mm_loadu_si128(reinterpret_cast<const __m128i*>(src));
+-
+-        // check if everything is ASCII
+-        // movemask extracts the high bit of every byte, so n is non-zero if something isn't ASCII
+-        uint n = _mm_movemask_epi8(data);
+-        if (!n)
+-            continue;
+-
+-        // find the next probable ASCII character
+-        // we don't want to load 16 bytes again in this loop if we know there are non-ASCII
+-        // characters still coming
+-        nextAscii = src + qBitScanReverse(n) + 1;
+-
+-        // return the non-ASCII character
+-        return src + qCountTrailingZeroBits(n);
+-    }
+-
+-    // do four characters at a time
+-    for ( ; end - src >= 4; src += 4) {
+-        quint32 data = qFromUnaligned<quint32>(src);
+-        data &= 0x80808080U;
+-        if (!data)
+-            continue;
+-
+-        // We don't try to guess which of the three bytes is ASCII and which
+-        // one isn't. The chance that at least two of them are non-ASCII is
+-        // better than 75%.
+-        nextAscii = src;
+-        return src;
+-    }
+-    nextAscii = end;
+-    return src;
+-}
+-
+-// Compare only the US-ASCII beginning of [src8, end8) and [src16, end16)
+-// and advance src8 and src16 to the first character that could not be compared
+-static void simdCompareAscii(const qchar8_t *&src8, const qchar8_t *end8, const char16_t *&src16, const char16_t *end16)
+-{
+-    int bitSpacing = 1;
+-    qptrdiff len = qMin(end8 - src8, end16 - src16);
+-    qptrdiff offset = 0;
+-    uint mask = 0;
+-
+-    // do sixteen characters at a time
+-    for ( ; offset + 16 < len; offset += 16) {
+-        __m128i data8 = _mm_loadu_si128(reinterpret_cast<const __m128i *>(src8 + offset));
+-#ifdef __AVX2__
+-        // AVX2 version, use 256-bit registers and VPMOVXZBW
+-        __m256i data16 = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(src16 + offset));
+-
+-        // expand US-ASCII as if it were Latin1 and confirm it's US-ASCII
+-        __m256i datax8 = _mm256_cvtepu8_epi16(data8);
+-        mask = _mm256_movemask_epi8(datax8);
+-        if (mask)
+-            break;
+-
+-        // compare Latin1 to UTF-16
+-        __m256i latin1cmp = _mm256_cmpeq_epi16(datax8, data16);
+-        mask = ~_mm256_movemask_epi8(latin1cmp);
+-        if (mask)
+-            break;
+-#else
+-        // non-AVX2 code
+-        __m128i datalo16 = _mm_loadu_si128(reinterpret_cast<const __m128i *>(src16 + offset));
+-        __m128i datahi16 = _mm_loadu_si128(reinterpret_cast<const __m128i *>(src16 + offset) + 1);
+-
+-        // expand US-ASCII as if it were Latin1, we'll confirm later
+-        __m128i datalo8 = _mm_unpacklo_epi8(data8, _mm_setzero_si128());
+-        __m128i datahi8 = _mm_unpackhi_epi8(data8, _mm_setzero_si128());
+-
+-        // compare Latin1 to UTF-16
+-        __m128i latin1cmplo = _mm_cmpeq_epi16(datalo8, datalo16);
+-        __m128i latin1cmphi = _mm_cmpeq_epi16(datahi8, datahi16);
+-        mask = _mm_movemask_epi8(latin1cmphi) << 16;
+-        mask |= ushort(_mm_movemask_epi8(latin1cmplo));
+-        mask = ~mask;
+-        if (mask)
+-            break;
+-
+-        // confirm it was US-ASCII
+-        mask = _mm_movemask_epi8(data8);
+-        if (mask) {
+-            bitSpacing = 0;
+-            break;
+-        }
+-#endif
+-    }
+-
+-    // helper for comparing 4 or 8 characters
+-    auto cmp_lt_16 = [&mask, &offset](int n, __m128i data8, __m128i data16) {
+-        // n = 4  ->  sizemask = 0xff
+-        // n = 8  ->  sizemask = 0xffff
+-        unsigned sizemask = (1U << (2 * n)) - 1;
+-
+-        // expand as if Latin1
+-        data8 = _mm_unpacklo_epi8(data8, _mm_setzero_si128());
+-
+-        // compare and confirm it's US-ASCII
+-        __m128i latin1cmp = _mm_cmpeq_epi16(data8, data16);
+-        mask = ~_mm_movemask_epi8(latin1cmp) & sizemask;
+-        mask |= _mm_movemask_epi8(data8);
+-        if (mask == 0)
+-            offset += n;
+-    };
+-
+-    // do eight characters at a time
+-    if (mask == 0 && offset + 8 < len) {
+-        __m128i data8 = _mm_loadl_epi64(reinterpret_cast<const __m128i *>(src8 + offset));
+-        __m128i data16 = _mm_loadu_si128(reinterpret_cast<const __m128i *>(src16 + offset));
+-        cmp_lt_16(8, data8, data16);
+-    }
+-
+-    // do four characters
+-    if (mask == 0 && offset + 4 < len) {
+-        __m128i data8 = _mm_cvtsi32_si128(qFromUnaligned<quint32>(src8 + offset));
+-        __m128i data16 = _mm_loadl_epi64(reinterpret_cast<const __m128i *>(src16 + offset));
+-        cmp_lt_16(4, data8, data16);
+-    }
+-
+-    // correct the source pointers to point to the first character we couldn't deal with
+-    if (mask)
+-        offset += qCountTrailingZeroBits(mask) >> bitSpacing;
+-    src8 += offset;
+-    src16 += offset;
+-}
+-#elif defined(__ARM_NEON__)
+-static inline bool simdEncodeAscii(uchar *&dst, const char16_t *&nextAscii, const char16_t *&src, const char16_t *end)
+-{
+-    uint16x8_t maxAscii = vdupq_n_u16(0x7f);
+-    uint16x8_t mask1 = { 1,      1 << 2, 1 << 4, 1 << 6, 1 << 8, 1 << 10, 1 << 12, 1 << 14 };
+-    uint16x8_t mask2 = vshlq_n_u16(mask1, 1);
+-
+-    // do sixteen characters at a time
+-    for ( ; end - src >= 16; src += 16, dst += 16) {
+-        // load 2 lanes (or: "load interleaved")
+-        uint16x8x2_t in = vld2q_u16(reinterpret_cast<const uint16_t *>(src));
+-
+-        // check if any of the elements > 0x7f, select 1 bit per element (element 0 -> bit 0, element 1 -> bit 1, etc),
+-        // add those together into a scalar, and merge the scalars.
+-        uint16_t nonAscii = vaddvq_u16(vandq_u16(vcgtq_u16(in.val[0], maxAscii), mask1))
+-                          | vaddvq_u16(vandq_u16(vcgtq_u16(in.val[1], maxAscii), mask2));
+-
+-        // merge the two lanes by shifting the values of the second by 8 and inserting them
+-        uint16x8_t out = vsliq_n_u16(in.val[0], in.val[1], 8);
+-
+-        // store, even if there are non-ASCII characters here
+-        vst1q_u8(dst, vreinterpretq_u8_u16(out));
+-
+-        if (nonAscii) {
+-            // find the next probable ASCII character
+-            // we don't want to load 32 bytes again in this loop if we know there are non-ASCII
+-            // characters still coming
+-            nextAscii = src + qBitScanReverse(nonAscii) + 1;
+-
+-            nonAscii = qCountTrailingZeroBits(nonAscii);
+-            dst += nonAscii;
+-            src += nonAscii;
+             return false;
+         }
+-    }
+-    return src == end;
+-}
+ 
+-static inline bool simdDecodeAscii(char16_t *&dst, const uchar *&nextAscii, const uchar *&src, const uchar *end)
++static inline bool simdDecodeAscii(char16_t *, const uchar *, const uchar *,
++                                   const uchar *)
+ {
+-    // do eight characters at a time
+-    uint8x8_t msb_mask = vdup_n_u8(0x80);
+-    uint8x8_t add_mask = { 1, 1 << 1, 1 << 2, 1 << 3, 1 << 4, 1 << 5, 1 << 6, 1 << 7 };
+-    for ( ; end - src >= 8; src += 8, dst += 8) {
+-        uint8x8_t c = vld1_u8(src);
+-        uint8_t n = vaddv_u8(vand_u8(vcge_u8(c, msb_mask), add_mask));
+-        if (!n) {
+-            // store
+-            vst1q_u16(reinterpret_cast<uint16_t *>(dst), vmovl_u8(c));
+-            continue;
+-        }
+-
+-        // copy the front part that is still ASCII
+-        while (!(n & 1)) {
+-            *dst++ = *src++;
+-            n >>= 1;
+-        }
+-
+-        // find the next probable ASCII character
+-        // we don't want to load 16 bytes again in this loop if we know there are non-ASCII
+-        // characters still coming
+-        n = qBitScanReverse(n);
+-        nextAscii = src + n + 1;
+         return false;
+-
+-    }
+-    return src == end;
+ }
+ 
+-static inline const uchar *simdFindNonAscii(const uchar *src, const uchar *end, const uchar *&nextAscii)
++static inline const uchar *simdFindNonAscii(const uchar *src, const uchar *end,
++                                            const uchar *&nextAscii)
+ {
+-    // The SIMD code below is untested, so just force an early return until
+-    // we've had the time to verify it works.
+-    nextAscii = end;
+-    return src;
+-
+-    // do eight characters at a time
+-    uint8x8_t msb_mask = vdup_n_u8(0x80);
+-    uint8x8_t add_mask = { 1, 1 << 1, 1 << 2, 1 << 3, 1 << 4, 1 << 5, 1 << 6, 1 << 7 };
+-    for ( ; end - src >= 8; src += 8) {
+-        uint8x8_t c = vld1_u8(src);
+-        uint8_t n = vaddv_u8(vand_u8(vcge_u8(c, msb_mask), add_mask));
+-        if (!n)
+-            continue;
+-
+-        // find the next probable ASCII character
+-        // we don't want to load 16 bytes again in this loop if we know there are non-ASCII
+-        // characters still coming
+-        nextAscii = src + qBitScanReverse(n) + 1;
+-
+-        // return the non-ASCII character
+-        return src + qCountTrailingZeroBits(n);
+-    }
+     nextAscii = end;
+     return src;
+ }
+ 
+-static void simdCompareAscii(const qchar8_t *&, const qchar8_t *, const char16_t *&, const char16_t *)
++static void simdCompareAscii(const qchar8_t *&, const qchar8_t *,
++                             const char16_t *&, const char16_t *)
+ {
+ }
+-#else
+-static inline bool simdEncodeAscii(uchar *, const char16_t *, const char16_t *, const char16_t *)
+-{
+-    return false;
+-}
+-
+-static inline bool simdDecodeAscii(char16_t *, const uchar *, const uchar *, const uchar *)
+-{
+-    return false;
+-}
+-
+-static inline const uchar *simdFindNonAscii(const uchar *src, const uchar *end, const uchar *&nextAscii)
+-{
+-    nextAscii = end;
+-    return src;
+-}
+-
+-static void simdCompareAscii(const qchar8_t *&, const qchar8_t *, const char16_t *&, const char16_t *)
+-{
+-}
+-#endif
+ 
+ enum { HeaderDone = 1 };
+ 
+ QByteArray QUtf8::convertFromUnicode(QStringView in)
+ {
+     qsizetype len = in.size();
+ 
+     // create a QByteArray with the worst case scenario size
+     QByteArray result(len * 3, Qt::Uninitialized);
+     uchar *dst = reinterpret_cast<uchar *>(const_cast<char *>(result.constData()));
+     const char16_t *src = reinterpret_cast<const char16_t *>(in.data());
+     const char16_t *const end = src + len;
+ 
+     while (src != end) {
+         const char16_t *nextAscii = end;
+-        if (simdEncodeAscii(dst, nextAscii, src, end))
+-            break;
+-
+         do {
+             char16_t u = *src++;
+             int res = QUtf8Functions::toUtf8<QUtf8BaseTraits>(u, dst, src, end);
+             if (res < 0) {
+                 // encoding error - append '?'
+                 *dst++ = '?';
+             }
+         } while (src < nextAscii);
+     }
+ 
+     result.truncate(dst - reinterpret_cast<uchar *>(const_cast<char *>(result.constData())));
+     return result;
+ }
+ 
+ QByteArray QUtf8::convertFromUnicode(QStringView in, QStringConverterBase::State *state)
+ {
+@@ -536,35 +152,32 @@
+             int res = QUtf8Functions::toUtf8<QUtf8BaseTraits>(state->state_data[0], cursor, src, end);
+             if (res < 0)
+                 cursor = appendReplacementChar(cursor);
+             state->state_data[0] = 0;
+             state->remainingChars = 0;
+         } else if (!(state->internalState & HeaderDone) && state->flags & QStringConverter::Flag::WriteBom) {
+             // append UTF-8 BOM
+             *cursor++ = utf8bom[0];
+             *cursor++ = utf8bom[1];
+             *cursor++ = utf8bom[2];
+             state->internalState |= HeaderDone;
+         }
+     }
+ 
+     while (src != end) {
+         const char16_t *nextAscii = end;
+-        if (simdEncodeAscii(cursor, nextAscii, src, end))
+-            break;
+-
+         do {
+             char16_t uc = *src++;
+             int res = QUtf8Functions::toUtf8<QUtf8BaseTraits>(uc, cursor, src, end);
+             if (Q_LIKELY(res >= 0))
+                 continue;
+ 
+             if (res == QUtf8BaseTraits::Error) {
+                 // encoding error
+                 ++state->invalidChars;
+                 cursor = appendReplacementChar(cursor);
+             } else if (res == QUtf8BaseTraits::EndOfString) {
+                 if (state->flags & QStringConverter::Flag::Stateless) {
+                     ++state->invalidChars;
+                     cursor = appendReplacementChar(cursor);
+                 } else {
+                     state->remainingChars = 1;
+--- qtbase/src/corelib/tools/qarraydata.cpp	2024-05-08 05:42:08.000000000 -0400
++++ qtbase/src/corelib/tools/qarraydata.cpp	2024-06-10 21:16:58.918078741 -0400
+@@ -123,72 +123,88 @@
+     // should not be anywhere near the overflow limit.
+     constexpr qsizetype FooterSize = qMax(sizeof(QString::value_type), sizeof(QByteArray::value_type));
+     if (objectSize <= FooterSize)
+         headerSize += FooterSize;
+ 
+     // allocSize = objectSize * capacity + headerSize, but checked for overflow
+     // plus padded to grow in size
+     if (option == QArrayData::Grow) {
+         return qCalculateGrowingBlockSize(capacity, objectSize, headerSize);
+     } else {
+         return { qCalculateBlockSize(capacity, objectSize, headerSize), capacity };
+     }
+ }
+ 
+ static QArrayData *allocateData(qsizetype allocSize)
+ {
+-    QArrayData *header = static_cast<QArrayData *>(::malloc(size_t(allocSize)));
++  QArrayData* header = nullptr;
++  void* voidHeader = nullptr;
++  qsizetype alignedAllocSize = (allocSize + 7) & ~7;
++
++#if (Q_OS_WINDOWS)
++  voidHeader = _aligned_alloc(size_t(alignedAllocSize), 8);
++#else
++  voidHeader = std::aligned_alloc(8, size_t(alignedAllocSize));
++#endif
++
++  (void) memset(voidHeader, 0, size_t(alignedAllocSize));
++  header = reinterpret_cast<QArrayData*>(voidHeader);
++
+     if (header) {
+         header->ref_.storeRelaxed(1);
+         header->flags = {};
+         header->alloc = 0;
++    header->bytesAlloc = alignedAllocSize;
+     }
++
+     return header;
+ }
+ 
+ namespace {
+ struct AllocationResult {
+     void *data;
+     QArrayData *header;
+ };
+ }
++
+ using QtPrivate::AlignedQArrayData;
+ 
+ static inline AllocationResult
+ allocateHelper(qsizetype objectSize, qsizetype alignment, qsizetype capacity,
+                QArrayData::AllocationOption option) noexcept
+ {
+     if (capacity == 0)
+         return {};
+ 
+     qsizetype headerSize = sizeof(AlignedQArrayData);
+     const qsizetype headerAlignment = alignof(AlignedQArrayData);
+ 
+     if (alignment > headerAlignment) {
+         // Allocate extra (alignment - Q_ALIGNOF(AlignedQArrayData)) padding
+         // bytes so we can properly align the data array. This assumes malloc is
+         // able to provide appropriate alignment for the header -- as it should!
+         // Effectively, we allocate one QTypedArrayData<T>::AlignmentDummy.
+         headerSize += alignment - headerAlignment;
+     }
++
+     Q_ASSERT(headerSize > 0);
+ 
+     auto blockSize = calculateBlockSize(capacity, objectSize, headerSize, option);
+     capacity = blockSize.elementCount;
+     qsizetype allocSize = blockSize.size;
+-    if (Q_UNLIKELY(allocSize < 0))      // handle overflow. cannot allocate reliably
++    if (allocSize < 0)                // handle overflow. cannot allocate reliably
+         return {};
+ 
+     QArrayData *header = allocateData(allocSize);
+     void *data = nullptr;
+     if (header) {
+         // find where offset should point to so that data() is aligned to alignment bytes
+         data = QTypedArrayData<void>::dataStart(header, alignment);
+         header->alloc = qsizetype(capacity);
+     }
+ 
+     return { data, header };
+ }
+ 
+ // Generic size and alignment allocation function
+ void *QArrayData::allocate(QArrayData **dptr, qsizetype objectSize, qsizetype alignment,
+                            qsizetype capacity, AllocationOption option) noexcept
+@@ -219,48 +235,80 @@
+ 
+     auto r = allocateHelper(2, alignof(AlignedQArrayData), capacity, option);
+     *dptr = r.header;
+     return r.data;
+ }
+ 
+ std::pair<QArrayData *, void *>
+ QArrayData::reallocateUnaligned(QArrayData *data, void *dataPointer,
+                                 qsizetype objectSize, qsizetype capacity, AllocationOption option) noexcept
+ {
+     Q_ASSERT(!data || !data->isShared());
+ 
+     const qsizetype headerSize = sizeof(AlignedQArrayData);
+     auto r = calculateBlockSize(capacity, objectSize, headerSize, option);
+     qsizetype allocSize = r.size;
+     capacity = r.elementCount;
+-    if (Q_UNLIKELY(allocSize < 0))
++    if (allocSize < 0)
+         return {};
+ 
+-    const qptrdiff offset = dataPointer
+-            ? reinterpret_cast<char *>(dataPointer) - reinterpret_cast<char *>(data)
+-            : headerSize;
++    qsizetype alignedAllocSize = (allocSize + 7) & ~7;
++    qptrdiff offset = dataPointer ?
++          reinterpret_cast<unsigned char*>(dataPointer) -
++          reinterpret_cast<unsigned char*>(data) :
++          headerSize;
++
+     Q_ASSERT(offset > 0);
+     Q_ASSERT(offset <= allocSize); // equals when all free space is at the beginning
+ 
+-    QArrayData *header = static_cast<QArrayData *>(::realloc(data, size_t(allocSize)));
++    QArrayData* header = nullptr;
++    void* voidHeader = nullptr;
++
++#if (Q_OS_WINDOWS)
++    voidHeader = _aligned_malloc(size_t(alignedAllocSize), 8U);
++    if (!voidHeader)
++      return { };
++#else
++    voidHeader = std::aligned_alloc(8U, size_t(alignedAllocSize));
++    if (!voidHeader)
++      return { };
++#endif
++
++    (void) memset(voidHeader, 0, size_t(alignedAllocSize));
++    QArrayData* tmpHeader =
++      reinterpret_cast<QArrayData*>(::realloc(data, size_t(allocSize)));
++    if (!tmpHeader)
++      return { };
++
++    (void) memcpy(voidHeader, tmpHeader, allocSize);
++    ::free(tmpHeader);
++    header = reinterpret_cast<QArrayData*>(voidHeader);
++    header->bytesAlloc = allocSize;
++
+     if (header) {
+         header->alloc = capacity;
+-        dataPointer = reinterpret_cast<char *>(header) + offset;
++        header->bytesAlloc = allocSize;
++        dataPointer = reinterpret_cast<unsigned char*>(header) + offset;
+     } else {
+         dataPointer = nullptr;
+     }
++
+     return {header, dataPointer};
+ }
+ 
+ void QArrayData::deallocate(QArrayData *data, qsizetype objectSize,
+         qsizetype alignment) noexcept
+ {
+     // Alignment is a power of two
+     Q_ASSERT(alignment >= qsizetype(alignof(QArrayData))
+             && !(alignment & (alignment - 1)));
+     Q_UNUSED(objectSize);
+     Q_UNUSED(alignment);
+ 
++#if (Q_OS_WINDOWS)
++    _aligned_free(data);
++#else
+     ::free(data);
++#endif
+ }
+ 
+ QT_END_NAMESPACE
+--- qtbase/src/corelib/tools/qarraydata.h	2024-05-08 05:42:08.000000000 -0400
++++ qtbase/src/corelib/tools/qarraydata.h	2024-06-10 21:16:58.918078741 -0400
+@@ -28,32 +28,33 @@
+     };
+ 
+     enum GrowthPosition {
+         GrowsAtEnd,
+         GrowsAtBeginning
+     };
+ 
+    enum ArrayOption {
+         ArrayOptionDefault = 0,
+         CapacityReserved     = 0x1  //!< the capacity was reserved by the user, try to keep it
+     };
+     Q_DECLARE_FLAGS(ArrayOptions, ArrayOption)
+ 
+     QBasicAtomicInt ref_;
+     ArrayOptions flags;
+     qsizetype alloc;
++    qsizetype bytesAlloc;
+ 
+     qsizetype allocatedCapacity() noexcept
+     {
+         return alloc;
+     }
+ 
+     qsizetype constAllocatedCapacity() const noexcept
+     {
+         return alloc;
+     }
+ 
+     /// Returns true if sharing took place
+     bool ref() noexcept
+     {
+         ref_.ref();
+         return true;
+@@ -82,34 +83,36 @@
+     {
+         if (flags & CapacityReserved && newSize < constAllocatedCapacity())
+             return constAllocatedCapacity();
+         return newSize;
+     }
+ 
+     Q_DECL_MALLOCLIKE
+     static Q_CORE_EXPORT void *allocate(QArrayData **pdata, qsizetype objectSize, qsizetype alignment,
+             qsizetype capacity, AllocationOption option = QArrayData::KeepSize) noexcept;
+     Q_DECL_MALLOCLIKE
+     static Q_CORE_EXPORT void *allocate1(QArrayData **pdata, qsizetype capacity,
+                                          AllocationOption option = QArrayData::KeepSize) noexcept;
+     Q_DECL_MALLOCLIKE
+     static Q_CORE_EXPORT void *allocate2(QArrayData **pdata, qsizetype capacity,
+                                          AllocationOption option = QArrayData::KeepSize) noexcept;
+ 
+-    [[nodiscard]] static Q_CORE_EXPORT std::pair<QArrayData *, void *> reallocateUnaligned(QArrayData *data, void *dataPointer,
+-            qsizetype objectSize, qsizetype newCapacity, AllocationOption option) noexcept;
++    [[nodiscard]] static Q_CORE_EXPORT std::pair<QArrayData *, void *>
++                  reallocateUnaligned(QArrayData *data, void *dataPointer,
++                                      qsizetype objectSize, qsizetype newCapacity,
++                                      AllocationOption option) noexcept;
+     static Q_CORE_EXPORT void deallocate(QArrayData *data, qsizetype objectSize,
+             qsizetype alignment) noexcept;
+ };
+ 
+ Q_DECLARE_OPERATORS_FOR_FLAGS(QArrayData::ArrayOptions)
+ 
+ namespace QtPrivate {
+ // QArrayData with strictest alignment requirements supported by malloc()
+ #if defined(Q_PROCESSOR_X86_32) && defined(Q_CC_GNU)
+ // GCC's definition is incorrect since GCC 8 (commit r240248 in SVN; commit
+ // 63012d9a57edc950c5f30242d1e19318b5708060 in Git). This is applied to all
+ // GCC-like compilers in case they decide to follow GCC's lead in being wrong.
+ constexpr size_t MaxPrimitiveAlignment = 2 * sizeof(void *);
+ #else
+ constexpr size_t MaxPrimitiveAlignment = alignof(std::max_align_t);
+ #endif
+--- qtbase/src/corelib/tools/qarraydatapointer.h	2024-05-08 05:42:08.000000000 -0400
++++ qtbase/src/corelib/tools/qarraydatapointer.h	2024-06-07 08:30:51.269623587 -0400
+@@ -423,37 +423,60 @@
+     QArrayDataPointer sliced(qsizetype pos, qsizetype n) &&
+     {
+         if (needsDetach())
+             return sliced(pos, n);
+         T *newBeginning = begin() + pos;
+         std::destroy(begin(), newBeginning);
+         std::destroy(newBeginning + n, end());
+         setBegin(newBeginning);
+         size = n;
+         return std::move(*this);
+     }
+ 
+     // forwards from QArrayData
+     qsizetype allocatedCapacity() noexcept { return d ? d->allocatedCapacity() : 0; }
+     qsizetype constAllocatedCapacity() const noexcept { return d ? d->constAllocatedCapacity() : 0; }
+     void ref() noexcept { if (d) d->ref(); }
+-    bool deref() noexcept { return !d || d->deref(); }
++
++    bool deref() noexcept {
++      if (!d)
++        return true;
++
++      return d->deref();
++    }
++
+     bool isMutable() const noexcept { return d; }
+-    bool isShared() const noexcept { return !d || d->isShared(); }
+-    bool isSharedWith(const QArrayDataPointer &other) const noexcept { return d && d == other.d; }
+-    bool needsDetach() const noexcept { return !d || d->needsDetach(); }
++
++    bool isShared() const noexcept {
++      if (!d)
++        return true;
++
++      return d->isShared();
++    }
++
++    bool isSharedWith(const QArrayDataPointer &other) const noexcept {
++      return d && d == other.d;
++    }
++
++    bool needsDetach() const noexcept {
++      if (!d)
++        return true;
++
++      return d->needsDetach();
++    }
++
+     qsizetype detachCapacity(qsizetype newSize) const noexcept { return d ? d->detachCapacity(newSize) : newSize; }
+     const typename Data::ArrayOptions flags() const noexcept { return d ? d->flags : Data::ArrayOptionDefault; }
+     void setFlag(typename Data::ArrayOptions f) noexcept { Q_ASSERT(d); d->flags |= f; }
+     void clearFlag(typename Data::ArrayOptions f) noexcept { if (d) d->flags &= ~f; }
+ 
+     Data *d_ptr() noexcept { return d; }
+     void setBegin(T *begin) noexcept { ptr = begin; }
+ 
+     qsizetype freeSpaceAtBegin() const noexcept
+     {
+         if (d == nullptr)
+             return 0;
+         return this->ptr - Data::dataStart(d, alignof(typename Data::AlignmentDummy));
+     }
+ 
+     qsizetype freeSpaceAtEnd() const noexcept
+--- qtbase/configure.cmake	2024-05-08 05:42:08.000000000 -0400
++++ qtbase/configure.cmake	2024-06-05 07:17:27.000000000 -0400
+@@ -887,32 +887,33 @@
+     CONDITION TEST_alloca_h
+ )
+ qt_feature("alloca_malloc_h" PRIVATE
+     LABEL "alloca() in malloc.h"
+     CONDITION NOT QT_FEATURE_alloca_h AND TEST_alloca_malloc_h
+ )
+ qt_feature("alloca" PRIVATE
+     LABEL "alloca()"
+     CONDITION QT_FEATURE_alloca_h OR QT_FEATURE_alloca_malloc_h OR TEST_alloca_stdlib_h
+ )
+ qt_feature("stack-protector-strong" PRIVATE
+     LABEL "stack protection"
+     CONDITION QNX AND TEST_stack_protector
+ )
+ qt_feature("system-zlib" PRIVATE
+     LABEL "Using system zlib"
++    AUTODETECT OFF
+     CONDITION WrapSystemZLIB_FOUND
+ )
+ qt_feature("zstd" PUBLIC
+     LABEL "Zstandard support"
+     CONDITION WrapZSTD_FOUND
+ )
+ qt_feature("stdlib-libcpp" PRIVATE
+     LABEL "Using stdlib=libc++"
+     AUTODETECT OFF
+     CONDITION MINGW OR (LINUX AND NOT ANDROID)
+ )
+ # Check whether CMake was built with zstd support.
+ # See https://gitlab.kitware.com/cmake/cmake/-/issues/21552
+ if(NOT DEFINED CACHE{QT_CMAKE_ZSTD_SUPPORT})
+     set(QT_CMAKE_ZSTD_SUPPORT FALSE CACHE INTERNAL "")
+     if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.18")
+--- qtbase/CMakeLists.txt	2024-05-08 05:42:08.000000000 -0400
++++ qtbase/CMakeLists.txt	2024-06-09 22:47:59.470142703 -0400
+@@ -16,17 +16,103 @@
+ 
+ qt_internal_check_if_path_has_symlinks("${CMAKE_BINARY_DIR}")
+ 
+ # This needs to be called before the first project() call.
+ qt_internal_qtbase_run_autodetect()
+ 
+ # This call will load any provided cmake toolchain file.
+ project(QtBase
+     VERSION "${QT_REPO_MODULE_VERSION}"
+     DESCRIPTION "Qt Base Libraries"
+     HOMEPAGE_URL "https://qt.io/"
+     LANGUAGES CXX C ASM
+ )
+ 
+ set(QT_BUILD_EXTRA_IDE_FILE_PATTERNS bin/* libexec/*)
+ 
++execute_process(COMMAND uname -m OUTPUT_VARIABLE OS_UNAME_MACHINE)
++string(STRIP ${OS_UNAME_MACHINE} OS_UNAME_MACHINE)
++execute_process(COMMAND uname -s OUTPUT_VARIABLE OS_UNAME_SYSTEM)
++string(STRIP ${OS_UNAME_SYSTEM} OS_UNAME_SYSTEM)
++
++if ("${OS_UNAME_SYSTEM}" STREQUAL "Darwin")
++  set(CC "/usr/bin/clang")
++  set(CXX "/usr/bin/clang++")
++endif()
++
++if ("${OS_UNAME_SYSTEM}" STREQUAL "Linux")
++  set(CC "/usr/bin/gcc")
++  set(CXX "/usr/bin/g++")
++endif()
++
++set(CPPFLAGS "-D_GNU_SOURCE -D_XOPEN_SOURCE=700 -D_REENTRANT")
++set(CPPFLAGS "${CPPFLAGS} -DHAVE_PTHREAD -DHAVE_SCHED -DHAVE_SCHED_YIELD")
++set(CFLAGS "-g -O2 -std=c11 ${CPPFLAGS} -pthread -Wall -Wextra -Wpedantic")
++set(CFLAGS "${CFLAGS} -fPIC -ffunction-sections -fdata-sections")
++set(CFLAGS "${CFLAGS} -fno-strict-aliasing -fno-omit-frame-pointer")
++set(CXXFLAGS "-g -O2 -std=c++17 ${CPPFLAGS} -pthread -Wall -Wextra -Wpedantic")
++set(CXXFLAGS "${CXXFLAGS} -fPIC -ffunction-sections -fdata-sections")
++set(CXXFLAGS "${CXXFLAGS} -fno-strict-aliasing -fno-omit-frame-pointer")
++
++set(CFLAGS_DEBUG "-g3 -O0 -std=c11 ${CPPFLAGS} -pthread -Wall -Wextra -Wpedantic")
++set(CFLAGS_DEBUG "${CFLAGS_DEBUG} -fPIC -ffunction-sections -fdata-sections")
++set(CFLAGS_DEBUG "${CFLAGS_DEBUG} -fno-strict-aliasing -fno-omit-frame-pointer")
++set(CXXFLAGS_DEBUG "-g3 -O0 -std=c++17 ${CPPFLAGS} -pthread -Wall -Wextra -Wpedantic")
++set(CXXFLAGS_DEBUG "${CXXFLAGS_DEBUG} -fPIC -ffunction-sections -fdata-sections")
++set(CXXFLAGS_DEBUG "${CXXFLAGS_DEBUG} -fno-strict-aliasing -fno-omit-frame-pointer")
++
++string(STRIP ${CMAKE_BUILD_TYPE} CMAKE_BUILD_TYPE)
++
++if ("${CMAKE_BUILD_TYPE}" STREQUAL "Release")
++  if ("${OS_UNAME_SYSTEM}" STREQUAL "Darwin")
++    set(LDFLAGS "-Wl,-O2 -fuse-ld=lld")
++  elseif ("${OS_UNAME_SYSTEM}" STREQUAL "Linux")
++    if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
++      set(LDFLAGS "-Wl,-O2 -Wl,-fuse-ld=lld")
++    elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
++      set(LDFLAGS "-Wl,-O2 -Wl,-fuse-ld=gold")
++    endif()
++  endif()
++elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
++  if ("${OS_UNAME_SYSTEM}" STREQUAL "Darwin")
++    set(LDFLAGS "-Wl,-O0 -Wl,-fuse-ld=lld")
++  elseif ("${OS_UNAME_SYSTEM}" STREQUAL "Linux")
++    if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
++      set(LDFLAGS "-Wl,-O0 -Wl,-fuse-ld=lld")
++    elseif (CMAKE_CXX_COMPILER_ID MATCHES "GNU")
++      set(LDFLAGS "-Wl,-O0 -Wl,-fuse-ld=gold")
++    endif()
++  endif()
++endif()
++
++set(CMAKE_INSTALL_PREFIX "/usr/local/qt-6.7.1")
++set(CMAKE_C_COMPILER "${CC}")
++set(CMAKE_CXX_COMPILER "${CXX}")
++
++
++if ("${CMAKE_BUILD_TYPE}" STREQUAL "Release")
++  set(CMAKE_C_FLAGS "${CFLAGS}")
++  set(CMAKE_C_FLAGS_RELEASE "${CFLAGS}")
++  set(CMAKE_C_FLAGS_DEBUG "${CFLAGS_DEBUG}")
++  set(CMAKE_CXX_FLAGS "${CXXFLAGS}")
++  set(CMAKE_CXX_FLAGS_RELEASE "${CXXFLAGS}")
++  set(CMAKE_CXX_FLAGS_DEBUG "${CXXFLAGS_DEBUG}")
++  set(CMAKE_EXE_LINKER_FLAGS "${LDFLAGS} -fPIE")
++  set(CMAKE_SHARED_LINKER_FLAGS "${LDFLAGS} -fPIC")
++elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
++  set(CMAKE_C_FLAGS "${CFLAGS_DEBUG}")
++  set(CMAKE_C_FLAGS_RELEASE "${CFLAGS_DEBUG}")
++  set(CMAKE_C_FLAGS_DEBUG "${CFLAGS_DEBUG}")
++  set(CMAKE_CXX_FLAGS "${CXXFLAGS_DEBUG}")
++  set(CMAKE_CXX_FLAGS_RELEASE "${CXXFLAGS_DEBUG}")
++  set(CMAKE_CXX_FLAGS_DEBUG "${CXXFLAGS_DEBUG}")
++  set(CMAKE_EXE_LINKER_FLAGS "${LDFLAGS} -fPIE")
++  set(CMAKE_SHARED_LINKER_FLAGS "${LDFLAGS} -fPIC")
++endif()
++
++set(CMAKE_VERBOSE_MAKEFILE ON CACHE BOOL "ON")
++
++add_compile_definitions(-D_REENTRANT -DHAVE_PTHREAD -DHAVE_SCHED)
++add_compile_definitions(-DHAVE_SCHED_YIELD)
++
+ qt_internal_qtbase_build_repo()
++

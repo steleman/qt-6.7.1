@@ -1,0 +1,560 @@
+4:if (QT_FEATURE_ffmpeg)
+5:    add_subdirectory(ffmpeg)
+./src/plugins/multimedia/CMakeLists.txt
+8:#include "qffmpeghwaccel_p.h"
+10:#include "qffmpegvideobuffer_p.h"
+90:// Make sure this is compatible with the layout used in ffmpeg's hwcontext_videotoolbox
+./src/plugins/multimedia/ffmpeg/qavfsamplebufferdelegate.mm
+23:#include "qffmpeg_p.h"
+24:#include "playbackengine/qffmpegmediadataholder_p.h"
+./src/plugins/multimedia/ffmpeg/qffmpegmediaplayer_p.h
+18:#include "qffmpeg_p.h"
+./src/plugins/multimedia/ffmpeg/qffmpegresampler_p.h
+3:#include <qffmpegvideosink_p.h>
+4:#include <qffmpegvideobuffer_p.h>
+33:#include "moc_qffmpegvideosink_p.cpp"
+./src/plugins/multimedia/ffmpeg/qffmpegvideosink.cpp
+17:#include "qffmpeghwaccel_p.h"
+./src/plugins/multimedia/ffmpeg/qffmpeghwaccel_vaapi_p.h
+17:#include "qffmpeghwaccel_p.h"
+./src/plugins/multimedia/ffmpeg/qffmpeghwaccel_d3d11_p.h
+15:    OUTPUT_NAME ffmpegmediaplugin
+18:        qffmpeg.cpp qffmpeg_p.h
+19:        qffmpegdefs_p.h
+20:        qffmpegioutils.cpp qffmpegioutils_p.h
+21:        qffmpegavaudioformat.cpp qffmpegavaudioformat_p.h
+22:        qffmpegaudiodecoder.cpp qffmpegaudiodecoder_p.h
+23:        qffmpegaudioinput.cpp qffmpegaudioinput_p.h
+24:        qffmpeghwaccel.cpp qffmpeghwaccel_p.h
+25:        qffmpegmediametadata.cpp qffmpegmediametadata_p.h
+26:        qffmpegmediaplayer.cpp qffmpegmediaplayer_p.h
+27:        qffmpegvideosink.cpp qffmpegvideosink_p.h
+28:        qffmpegmediaformatinfo.cpp qffmpegmediaformatinfo_p.h
+29:        qffmpegmediaintegration.cpp qffmpegmediaintegration_p.h
+30:        qffmpegvideobuffer.cpp qffmpegvideobuffer_p.h
+31:        qffmpegimagecapture.cpp qffmpegimagecapture_p.h
+32:        qffmpegmediacapturesession.cpp qffmpegmediacapturesession_p.h
+33:        qffmpegmediarecorder.cpp qffmpegmediarecorder_p.h
+34:        qffmpegthread.cpp qffmpegthread_p.h
+35:        qffmpegresampler.cpp qffmpegresampler_p.h
+36:        qffmpegencodingformatcontext.cpp qffmpegencodingformatcontext_p.h
+38:        qffmpegsurfacecapturegrabber.cpp qffmpegsurfacecapturegrabber_p.h
+39:        qffmpegsymbolsresolve_p.h
+41:        qffmpegplaybackengine.cpp qffmpegplaybackengine_p.h
+42:        playbackengine/qffmpegplaybackenginedefs_p.h
+43:        playbackengine/qffmpegplaybackengineobject.cpp playbackengine/qffmpegplaybackengineobject_p.h
+44:        playbackengine/qffmpegdemuxer.cpp playbackengine/qffmpegdemuxer_p.h
+45:        playbackengine/qffmpegstreamdecoder.cpp playbackengine/qffmpegstreamdecoder_p.h
+46:        playbackengine/qffmpegrenderer.cpp playbackengine/qffmpegrenderer_p.h
+47:        playbackengine/qffmpegaudiorenderer.cpp playbackengine/qffmpegaudiorenderer_p.h
+48:        playbackengine/qffmpegvideorenderer.cpp playbackengine/qffmpegvideorenderer_p.h
+49:        playbackengine/qffmpegsubtitlerenderer.cpp playbackengine/qffmpegsubtitlerenderer_p.h
+50:        playbackengine/qffmpegtimecontroller.cpp playbackengine/qffmpegtimecontroller_p.h
+51:        playbackengine/qffmpegmediadataholder.cpp playbackengine/qffmpegmediadataholder_p.h
+52:        playbackengine/qffmpegcodec.cpp playbackengine/qffmpegcodec_p.h
+53:        playbackengine/qffmpegpacket_p.h
+54:        playbackengine/qffmpegframe_p.h
+55:        playbackengine/qffmpegpositionwithoffset_p.h
+57:        recordingengine/qffmpegaudioencoder_p.h
+58:        recordingengine/qffmpegaudioencoder.cpp
+59:        recordingengine/qffmpegaudioencoderutils_p.h
+60:        recordingengine/qffmpegaudioencoderutils.cpp
+61:        recordingengine/qffmpegencoderthread_p.h
+62:        recordingengine/qffmpegencoderthread.cpp
+63:        recordingengine/qffmpegencoderoptions_p.h
+64:        recordingengine/qffmpegencoderoptions.cpp
+65:        recordingengine/qffmpegmuxer_p.h
+66:        recordingengine/qffmpegmuxer.cpp
+67:        recordingengine/qffmpegrecordingengine_p.h
+68:        recordingengine/qffmpegrecordingengine.cpp
+69:        recordingengine/qffmpegvideoencoder_p.h
+70:        recordingengine/qffmpegvideoencoder.cpp
+71:        recordingengine/qffmpegvideoencoderutils_p.h
+72:        recordingengine/qffmpegvideoencoderutils.cpp
+73:        recordingengine/qffmpegvideoframeencoder_p.h
+74:        recordingengine/qffmpegvideoframeencoder.cpp
+91:        qffmpegopensslsymbols.cpp
+117:        qffmpegsymbolsresolveutils.cpp qffmpegsymbolsresolveutils_p.h
+133:        qffmpegvaapisymbols.cpp
+145:        qffmpeghwaccel_vaapi.cpp qffmpeghwaccel_vaapi_p.h
+148:        qffmpeghwaccel_vaapi.cpp
+158:        qffmpeghwaccel_videotoolbox.mm qffmpeghwaccel_videotoolbox_p.h
+163:        qffmpeghwaccel_videotoolbox.mm # AVMediaType clash between libavformat and AVFoundation
+190:        qffmpeghwaccel_d3d11.cpp qffmpeghwaccel_d3d11_p.h
+192:        qffmpegscreencapture_dxgi.cpp qffmpegscreencapture_dxgi_p.h
+204:        qffmpegwindowcapture_uwp.cpp qffmpegwindowcapture_uwp_p.h
+246:            qffmpeghwaccel_mediacodec.cpp qffmpeghwaccel_mediacodec_p.h
+268:        ${INSTALL_PLUGINSDIR}/multimedia/libplugins_multimedia_ffmpegmediaplugin.so
+280:set(ffmpeg_libs FFmpeg::avformat FFmpeg::avcodec FFmpeg::swresample FFmpeg::swscale FFmpeg::avutil)
+288:    qt_internal_multimedia_copy_or_install_ffmpeg()
+291:qt_internal_extend_target(QFFmpegMediaPlugin LIBRARIES ${ffmpeg_libs})
+./src/plugins/multimedia/ffmpeg/CMakeLists.txt
+20:static Q_LOGGING_CATEGORY(qLcV4L2CameraDevices, "qt.multimedia.ffmpeg.v4l2cameradevices");
+./src/plugins/multimedia/ffmpeg/qv4l2cameradevices.cpp
+3:#include "qffmpegplaybackengine_p.h"
+10:#include "playbackengine/qffmpegdemuxer_p.h"
+11:#include "playbackengine/qffmpegstreamdecoder_p.h"
+12:#include "playbackengine/qffmpegsubtitlerenderer_p.h"
+13:#include "playbackengine/qffmpegvideorenderer_p.h"
+14:#include "playbackengine/qffmpegaudiorenderer_p.h"
+22:static Q_LOGGING_CATEGORY(qLcPlaybackEngine, "qt.multimedia.ffmpeg.playbackengine");
+636:#include "moc_qffmpegplaybackengine_p.cpp"
+./src/plugins/multimedia/ffmpeg/qffmpegplaybackengine.cpp
+17:static Q_LOGGING_CATEGORY(qLCAndroidCameraFrame, "qt.multimedia.ffmpeg.android.camera.frame");
+./src/plugins/multimedia/ffmpeg/qandroidcameraframe.cpp
+17:#include "qffmpeghwaccel_p.h"
+./src/plugins/multimedia/ffmpeg/qffmpeghwaccel_videotoolbox_p.h
+7:#include "qffmpegdefs_p.h"
+./src/plugins/multimedia/ffmpeg/qffmpegencodingformatcontext_p.h
+4:#include "qffmpeghwaccel_mediacodec_p.h"
+./src/plugins/multimedia/ffmpeg/qffmpeghwaccel_mediacodec.cpp
+4:#include "qffmpegwindowcapture_uwp_p.h"
+5:#include "qffmpegsurfacecapturegrabber_p.h"
+58:Q_LOGGING_CATEGORY(qLcWindowCaptureUwp, "qt.multimedia.ffmpeg.windowcapture.uwp");
+509:#include "qffmpegwindowcapture_uwp.moc"
+./src/plugins/multimedia/ffmpeg/qffmpegwindowcapture_uwp.cpp
+22:#include "qffmpeghwaccel_p.h"
+61:    std::optional<int> ffmpegHWPixelFormat() const override;
+./src/plugins/multimedia/ffmpeg/qavfcamera_p.h
+6:#include "qffmpegmediaintegration_p.h"
+7:#include "qffmpegmediaformatinfo_p.h"
+8:#include "qffmpegmediaplayer_p.h"
+9:#include "qffmpegvideosink_p.h"
+10:#include "qffmpegmediacapturesession_p.h"
+11:#include "qffmpegmediarecorder_p.h"
+12:#include "qffmpegimagecapture_p.h"
+13:#include "qffmpegaudioinput_p.h"
+14:#include "qffmpegaudiodecoder_p.h"
+15:#include "qffmpegresampler_p.h"
+16:#include "qffmpegsymbolsresolve_p.h"
+33:#include "qffmpegscreencapture_dxgi_p.h"
+55:#include "qffmpegwindowcapture_uwp_p.h"
+72:    Q_PLUGIN_METADATA(IID QPlatformMediaPlugin_iid FILE "ffmpeg.json")
+81:        if (name == u"ffmpeg")
+90:static void qffmpegLogCallback(void *ptr, int level, const char *fmt, va_list vl)
+123:    av_log_set_callback(&qffmpegLogCallback);
+172:    : QPlatformMediaIntegration(QLatin1String("ffmpeg"))
+358:    // setting our javavm into ffmpeg.
+371:#include "qffmpegmediaintegration.moc"
+./src/plugins/multimedia/ffmpeg/qffmpegmediaintegration.cpp
+18:#include "qffmpeghwaccel_p.h"
+./src/plugins/multimedia/ffmpeg/qffmpeghwaccel_mediacodec_p.h
+4:#include "qffmpegmediaplayer_p.h"
+9:#include "qffmpegplaybackengine_p.h"
+403:#include "moc_qffmpegmediaplayer_p.cpp"
+./src/plugins/multimedia/ffmpeg/qffmpegmediaplayer.cpp
+23:#include "qffmpeg_p.h"
+24:#include "qffmpeghwaccel_p.h"
+./src/plugins/multimedia/ffmpeg/qffmpegvideobuffer_p.h
+18:#include "qffmpegimagecapture_p.h"
+./src/plugins/multimedia/ffmpeg/qandroidimagecapture_p.h
+6:#include "qffmpegsymbolsresolveutils_p.h"
+./src/plugins/multimedia/ffmpeg/qffmpegvaapisymbols.cpp
+4:#include "qffmpegsymbolsresolveutils_p.h"
+12:static Q_LOGGING_CATEGORY(qLcLibSymbolsRelolver, "qt.multimedia.ffmpeg.libsymbolsresolver");
+./src/plugins/multimedia/ffmpeg/qffmpegsymbolsresolveutils.cpp
+18:static Q_LOGGING_CATEGORY(qLcV4L2Camera, "qt.multimedia.ffmpeg.v4l2camera");
+./src/plugins/multimedia/ffmpeg/qv4l2camera.cpp
+17:#include "playbackengine/qffmpegrenderer_p.h"
+./src/plugins/multimedia/ffmpeg/playbackengine/qffmpegaudiorenderer_p.h
+17:#include "playbackengine/qffmpegrenderer_p.h"
+./src/plugins/multimedia/ffmpeg/playbackengine/qffmpegvideorenderer_p.h
+4:#include "playbackengine/qffmpegcodec_p.h"
+./src/plugins/multimedia/ffmpeg/playbackengine/qffmpegcodec.cpp
+4:#include "playbackengine/qffmpegsubtitlerenderer_p.h"
+44:#include "moc_qffmpegsubtitlerenderer_p.cpp"
+./src/plugins/multimedia/ffmpeg/playbackengine/qffmpegsubtitlerenderer.cpp
+17:#include "playbackengine/qffmpegplaybackenginedefs_p.h"
+./src/plugins/multimedia/ffmpeg/playbackengine/qffmpegplaybackengineobject_p.h
+20:#include "qffmpeg_p.h"
+./src/plugins/multimedia/ffmpeg/playbackengine/qffmpegmediadataholder_p.h
+18:#include "qffmpeg_p.h"
+20:#include "playbackengine/qffmpegpositionwithoffset_p.h"
+./src/plugins/multimedia/ffmpeg/playbackengine/qffmpegpacket_p.h
+4:#include "playbackengine/qffmpegdemuxer_p.h"
+17:static Q_LOGGING_CATEGORY(qLcDemuxer, "qt.multimedia.ffmpeg.demuxer");
+228:#include "moc_qffmpegdemuxer_p.cpp"
+./src/plugins/multimedia/ffmpeg/playbackengine/qffmpegdemuxer.cpp
+4:#include "playbackengine/qffmpegstreamdecoder_p.h"
+5:#include "playbackengine/qffmpegmediadataholder_p.h"
+10:static Q_LOGGING_CATEGORY(qLcStreamDecoder, "qt.multimedia.ffmpeg.streamdecoder");
+240:#include "moc_qffmpegstreamdecoder_p.cpp"
+./src/plugins/multimedia/ffmpeg/playbackengine/qffmpegstreamdecoder.cpp
+4:#include "playbackengine/qffmpegmediadataholder_p.h"
+6:#include "qffmpegmediametadata_p.h"
+7:#include "qffmpegmediaformatinfo_p.h"
+8:#include "qffmpegioutils_p.h"
+22:static Q_LOGGING_CATEGORY(qLcMediaDataHolder, "qt.multimedia.ffmpeg.mediadataholder")
+34:    // In some cases ffmpeg reports negative duration that is definitely invalid.
+244:    // get it from ffmpeg's duration estimation instead.
+./src/plugins/multimedia/ffmpeg/playbackengine/qffmpegmediadataholder.cpp
+4:#include "playbackengine/qffmpegvideorenderer_p.h"
+5:#include "qffmpegvideobuffer_p.h"
+78:#include "moc_qffmpegvideorenderer_p.cpp"
+./src/plugins/multimedia/ffmpeg/playbackengine/qffmpegvideorenderer.cpp
+4:#include "playbackengine/qffmpegtimecontroller_p.h"
+./src/plugins/multimedia/ffmpeg/playbackengine/qffmpegtimecontroller.cpp
+4:#include "playbackengine/qffmpegplaybackengineobject_p.h"
+109:#include "moc_qffmpegplaybackengineobject_p.cpp"
+./src/plugins/multimedia/ffmpeg/playbackengine/qffmpegplaybackengineobject.cpp
+21:#include "qffmpeg_p.h"
+22:#include "qffmpeghwaccel_p.h"
+./src/plugins/multimedia/ffmpeg/playbackengine/qffmpegcodec_p.h
+18:#include "qffmpeg_p.h"
+19:#include "playbackengine/qffmpegcodec_p.h"
+20:#include "playbackengine/qffmpegpositionwithoffset_p.h"
+./src/plugins/multimedia/ffmpeg/playbackengine/qffmpegframe_p.h
+17:#include "playbackengine/qffmpegplaybackengineobject_p.h"
+19:#include "playbackengine/qffmpegpacket_p.h"
+20:#include "playbackengine/qffmpegpositionwithoffset_p.h"
+./src/plugins/multimedia/ffmpeg/playbackengine/qffmpegdemuxer_p.h
+4:#include "playbackengine/qffmpegrenderer_p.h"
+11:static Q_LOGGING_CATEGORY(qLcRenderer, "qt.multimedia.ffmpeg.renderer");
+216:#include "moc_qffmpegrenderer_p.cpp"
+./src/plugins/multimedia/ffmpeg/playbackengine/qffmpegrenderer.cpp
+4:#include "playbackengine/qffmpegaudiorenderer_p.h"
+10:#include "qffmpegresampler_p.h"
+11:#include "qffmpegmediaformatinfo_p.h"
+15:static Q_LOGGING_CATEGORY(qLcAudioRenderer, "qt.multimedia.ffmpeg.audiorenderer");
+355:#include "moc_qffmpegaudiorenderer_p.cpp"
+./src/plugins/multimedia/ffmpeg/playbackengine/qffmpegaudiorenderer.cpp
+17:#include "playbackengine/qffmpegplaybackengineobject_p.h"
+18:#include "playbackengine/qffmpegtimecontroller_p.h"
+19:#include "playbackengine/qffmpegframe_p.h"
+./src/plugins/multimedia/ffmpeg/playbackengine/qffmpegrenderer_p.h
+4:#ifndef qffmpegpositionwithoffset_p_H
+5:#define qffmpegpositionwithoffset_p_H
+40:#endif // qffmpegpositionwithoffset_p_H
+./src/plugins/multimedia/ffmpeg/playbackengine/qffmpegpositionwithoffset_p.h
+16:#include "playbackengine/qffmpegplaybackengineobject_p.h"
+17:#include "playbackengine/qffmpegframe_p.h"
+18:#include "playbackengine/qffmpegpacket_p.h"
+19:#include "playbackengine/qffmpegpositionwithoffset_p.h"
+./src/plugins/multimedia/ffmpeg/playbackengine/qffmpegstreamdecoder_p.h
+17:#include "playbackengine/qffmpegrenderer_p.h"
+./src/plugins/multimedia/ffmpeg/playbackengine/qffmpegsubtitlerenderer_p.h
+4:#include "qffmpeghwaccel_d3d11_p.h"
+5:#include "playbackengine/qffmpegstreamdecoder_p.h"
+8:#include "qffmpegvideobuffer_p.h"
+228:    const ComPtr<ID3D11Texture2D> ffmpegTex = reinterpret_cast<ID3D11Texture2D *>(frame->data[0]);
+248:                                          ffmpegTex, index, frameSize)) {
+./src/plugins/multimedia/ffmpeg/qffmpeghwaccel_d3d11.cpp
+17:#include "qffmpegdefs_p.h"
+18:#include "qffmpegavaudioformat_p.h"
+./src/plugins/multimedia/ffmpeg/qffmpeg_p.h
+18:#include "qffmpeghwaccel_p.h"
+46:    std::optional<int> ffmpegHWPixelFormat() const override;
+./src/plugins/multimedia/ffmpeg/qandroidcamera_p.h
+48:#include "playbackengine/qffmpegplaybackenginedefs_p.h"
+49:#include "playbackengine/qffmpegtimecontroller_p.h"
+50:#include "playbackengine/qffmpegmediadataholder_p.h"
+51:#include "playbackengine/qffmpegcodec_p.h"
+52:#include "playbackengine/qffmpegpositionwithoffset_p.h"
+./src/plugins/multimedia/ffmpeg/qffmpegplaybackengine_p.h
+6:#include "qffmpegsurfacecapturegrabber_p.h"
+11:#include "qffmpeghwaccel_p.h"
+98:std::optional<int> QAVFScreenCapture::ffmpegHWPixelFormat() const
+./src/plugins/multimedia/ffmpeg/qavfscreencapture.mm
+4:#include "qffmpegimagecapture_p.h"
+271:#include "moc_qffmpegimagecapture_p.cpp"
+./src/plugins/multimedia/ffmpeg/qffmpegimagecapture.cpp
+4:#include "qffmpeg_p.h"
+8:#include <qffmpeghwaccel_p.h> // TODO: probably decompose HWAccel and get rid of the header in the base utils
+39:static Q_LOGGING_CATEGORY(qLcFFmpegUtils, "qt.multimedia.ffmpeg.utils");
+412:            // Probably, it's ffmpeg bug: avcodec_get_hw_config returns null even though
+./src/plugins/multimedia/ffmpeg/qffmpeg.cpp
+2:    "Keys": [ "ffmpeg" ]
+./src/plugins/multimedia/ffmpeg/ffmpeg.json
+4:#include "qffmpegthread_p.h"
+./src/plugins/multimedia/ffmpeg/qffmpegthread.cpp
+22:#include <qffmpegvideobuffer_p.h>
+44:static Q_LOGGING_CATEGORY(qLCAndroidCamera, "qt.multimedia.ffmpeg.androidCamera");
+138:std::optional<int> QAndroidCamera::ffmpegHWPixelFormat() const
+./src/plugins/multimedia/ffmpeg/qandroidcamera.cpp
+4:#include "qffmpegmediarecorder_p.h"
+10:#include "qffmpegaudioinput_p.h"
+12:#include "recordingengine/qffmpegrecordingengine_p.h"
+13:#include "qffmpegmediacapturesession_p.h"
+18:static Q_LOGGING_CATEGORY(qLcMediaEncoder, "qt.multimedia.ffmpeg.encoder");
+170:#include "moc_qffmpegmediarecorder_p.cpp"
+./src/plugins/multimedia/ffmpeg/qffmpegmediarecorder.cpp
+16:#include "qffmpegvideobuffer_p.h"
+17:#include "qffmpegvideosink_p.h"
+274:        // This flag determines priorities of using ffmpeg hw frames or
+331:std::optional<int> QAVFCamera::ffmpegHWPixelFormat() const
+./src/plugins/multimedia/ffmpeg/qavfcamera.mm
+28:  (LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(58, 91, 100)) // since ffmpeg n4.3
+30:  (LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(59, 18, 100)) // since ffmpeg n5.0
+32:  (LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(60, 3, 100)) // since ffmpeg n6.0
+34:  (LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(60, 15, 100)) // since ffmpeg n6.1
+./src/plugins/multimedia/ffmpeg/qffmpegdefs_p.h
+3:#include "qffmpegresampler_p.h"
+4:#include "playbackengine/qffmpegcodec_p.h"
+5:#include "qffmpegmediaformatinfo_p.h"
+8:static Q_LOGGING_CATEGORY(qLcResampler, "qt.multimedia.ffmpeg.resampler")
+83:        // the ffmpeg resampler bufferises the rest of frames that makes
+./src/plugins/multimedia/ffmpeg/qffmpegresampler.cpp
+15:static Q_LOGGING_CATEGORY(qLCAndroidVideoDevices, "qt.multimedia.ffmpeg.android.videoDevices")
+./src/plugins/multimedia/ffmpeg/qandroidvideodevices.cpp
+4:#include "qffmpegencodingformatcontext_p.h"
+5:#include "qffmpegmediaformatinfo_p.h"
+6:#include "qffmpegioutils_p.h"
+14:static Q_LOGGING_CATEGORY(qLcEncodingFormatContext, "qt.multimedia.ffmpeg.encodingformatcontext");
+17:// In the example https://ffmpeg.org/doxygen/trunk/avio_read_callback_8c-example.html,
+./src/plugins/multimedia/ffmpeg/qffmpegencodingformatcontext.cpp
+6:#include "qffmpegsurfacecapturegrabber_p.h"
+./src/plugins/multimedia/ffmpeg/qcgwindowcapture.mm
+4:#include "qffmpegsurfacecapturegrabber_p.h"
+13:static Q_LOGGING_CATEGORY(qLcScreenCaptureGrabber, "qt.multimedia.ffmpeg.surfacecapturegrabber");
+202:#include "moc_qffmpegsurfacecapturegrabber_p.cpp"
+./src/plugins/multimedia/ffmpeg/qffmpegsurfacecapturegrabber.cpp
+14:static Q_LOGGING_CATEGORY(qLcV4L2MemoryTransfer, "qt.multimedia.ffmpeg.v4l2camera.memorytransfer");
+./src/plugins/multimedia/ffmpeg/qv4l2memorytransfer.cpp
+19:#include <qffmpeg_p.h>
+./src/plugins/multimedia/ffmpeg/qffmpegaudiodecoder_p.h
+22:#include "qffmpeg_p.h"
+./src/plugins/multimedia/ffmpeg/qffmpegmediaformatinfo_p.h
+17:#include "qffmpeg_p.h"
+./src/plugins/multimedia/ffmpeg/qffmpeghwaccel_p.h
+4:function(qt_internal_multimedia_set_ffmpeg_link_directory directory)
+5:    foreach (lib ${ffmpeg_libs} FFmpeg)
+10:function(qt_internal_multimedia_copy_or_install_ffmpeg)
+24:        set(ffmpeg_output_dir "${QT_BUILD_DIR}/${install_dir}")
+25:        file(MAKE_DIRECTORY ${ffmpeg_output_dir})
+29:            if(NOT EXISTS "${ffmpeg_output_dir}/${lib_name}")
+30:                file(COPY ${lib_path} DESTINATION ${ffmpeg_output_dir})
+37:            qt_internal_multimedia_set_ffmpeg_link_directory(${ffmpeg_output_dir})
+./src/plugins/multimedia/ffmpeg/cmake/QtDeployFFmpeg.cmake
+18:#include "qffmpegdefs_p.h"
+./src/plugins/multimedia/ffmpeg/qffmpegavaudioformat_p.h
+4:#include "qffmpegvideobuffer_p.h"
+7:#include "qffmpeghwaccel_p.h"
+27:static Q_LOGGING_CATEGORY(qLcFFmpegVideoBuffer, "qt.multimedia.ffmpeg.videobuffer");
+./src/plugins/multimedia/ffmpeg/qffmpegvideobuffer.cpp
+6:#include "qffmpegsymbolsresolveutils_p.h"
+./src/plugins/multimedia/ffmpeg/qffmpegopensslsymbols.cpp
+19:#include "qffmpegdefs_p.h"
+./src/plugins/multimedia/ffmpeg/qffmpegioutils_p.h
+4:#include "qffmpeghwaccel_videotoolbox_p.h"
+11:#include <qffmpegvideobuffer_p.h>
+31:static Q_LOGGING_CATEGORY(qLcVideotoolbox, "qt.multimedia.ffmpeg.videotoolbox")
+./src/plugins/multimedia/ffmpeg/qffmpeghwaccel_videotoolbox.mm
+19:#include <qffmpeghwaccel_p.h>
+./src/plugins/multimedia/ffmpeg/qffmpegvideosink_p.h
+6:#include "qffmpeghwaccel_p.h"
+8:#include "qffmpeghwaccel_vaapi_p.h"
+11:#include "qffmpeghwaccel_videotoolbox_p.h"
+14:#include "qffmpeghwaccel_d3d11_p.h"
+19:#    include "qffmpeghwaccel_mediacodec_p.h"
+21:#include "qffmpeg_p.h"
+22:#include "qffmpegvideobuffer_p.h"
+37:static Q_LOGGING_CATEGORY(qLHWAccel, "qt.multimedia.ffmpeg.hwaccel");
+51:    // if it's included into the ffmpeg build and vdpau drivers are installed.
+./src/plugins/multimedia/ffmpeg/qffmpeghwaccel.cpp
+19:#include <qffmpeg_p.h>
+./src/plugins/multimedia/ffmpeg/qffmpegmediametadata_p.h
+20:#include "qffmpegmediacapturesession_p.h"
+./src/plugins/multimedia/ffmpeg/qffmpegimagecapture_p.h
+5:#include "qffmpegsurfacecapturegrabber_p.h"
+29:static Q_LOGGING_CATEGORY(qLcX11SurfaceCapture, "qt.multimedia.ffmpeg.qx11surfacecapture");
+./src/plugins/multimedia/ffmpeg/qx11surfacecapture.cpp
+4:#include "qffmpegmediametadata_p.h"
+15:static Q_LOGGING_CATEGORY(qLcMetaData, "qt.multimedia.ffmpeg.metadata")
+19:struct ffmpegTagToMetaDataKey
+25:constexpr ffmpegTagToMetaDataKey ffmpegTagToMetaDataKey[] = {
+54:    const auto *map = ffmpegTagToMetaDataKey;
+65:    const auto *map = ffmpegTagToMetaDataKey;
+./src/plugins/multimedia/ffmpeg/qffmpegmediametadata.cpp
+3:#include "qffmpegaudioinput_p.h"
+193:#include "moc_qffmpegaudioinput_p.cpp"
+195:#include "qffmpegaudioinput.moc"
+./src/plugins/multimedia/ffmpeg/qffmpegaudioinput.cpp
+4:#include "qffmpegavaudioformat_p.h"
+6:#include "qffmpegmediaformatinfo_p.h"
+./src/plugins/multimedia/ffmpeg/qffmpegavaudioformat.cpp
+7:#include "qffmpegsurfacecapturegrabber_p.h"
+14:static Q_LOGGING_CATEGORY(qLcGdiWindowCapture, "qt.multimedia.ffmpeg.gdiwindowcapture");
+./src/plugins/multimedia/ffmpeg/qgdiwindowcapture.cpp
+4:#include "qffmpegmediacapturesession_p.h"
+9:#include "qffmpegimagecapture_p.h"
+10:#include "qffmpegmediarecorder_p.h"
+13:#include "qffmpegaudioinput_p.h"
+22:static Q_LOGGING_CATEGORY(qLcFFmpegMediaCaptureSession, "qt.multimedia.ffmpeg.mediacapturesession")
+121:    auto ffmpegAudioInput = dynamic_cast<QFFmpegAudioInput *>(input);
+122:    Q_ASSERT(!!input == !!ffmpegAudioInput);
+124:    if (m_audioInput == ffmpegAudioInput)
+130:    m_audioInput = ffmpegAudioInput;
+286:#include "moc_qffmpegmediacapturesession_p.cpp"
+./src/plugins/multimedia/ffmpeg/qffmpegmediacapturesession.cpp
+4:#include "qffmpegmediaformatinfo_p.h"
+12:static Q_LOGGING_CATEGORY(qLcMediaFormatInfo, "qt.multimedia.ffmpeg.mediaformatinfo")
+./src/plugins/multimedia/ffmpeg/qffmpegmediaformatinfo.cpp
+18:#include "qffmpegthread_p.h"
+./src/plugins/multimedia/ffmpeg/qffmpegaudioinput_p.h
+4:#include "qffmpeghwaccel_vaapi_p.h"
+13:#include "qffmpegvideobuffer_p.h"
+64:static Q_LOGGING_CATEGORY(qLHWAccelVAAPI, "qt.multimedia.ffmpeg.hwaccelvaapi");
+./src/plugins/multimedia/ffmpeg/qffmpeghwaccel_vaapi.cpp
+7:#include "qffmpeg_p.h"
+./src/plugins/multimedia/ffmpeg/recordingengine/qffmpegaudioencoderutils_p.h
+17:#include "qffmpeghwaccel_p.h"
+./src/plugins/multimedia/ffmpeg/recordingengine/qffmpegencoderoptions_p.h
+4:#include "qffmpegvideoencoderutils_p.h"
+./src/plugins/multimedia/ffmpeg/recordingengine/qffmpegvideoencoderutils.cpp
+6:#include "qffmpegthread_p.h"
+7:#include "qffmpeg_p.h"
+./src/plugins/multimedia/ffmpeg/recordingengine/qffmpegmuxer_p.h
+4:#include "qffmpegvideoframeencoder_p.h"
+5:#include "qffmpegmediaformatinfo_p.h"
+6:#include "qffmpegencoderoptions_p.h"
+7:#include "qffmpegvideoencoderutils_p.h"
+12:static Q_LOGGING_CATEGORY(qLcVideoFrameEncoder, "qt.multimedia.ffmpeg.videoencoder");
+145:    // Apples HEVC decoders don't like the hev1 tag ffmpeg uses by default, use hvc1 as the more commonly accepted tag
+330:        // Workaround for some ffmpeg codecs bugs (e.g. nvenc)
+./src/plugins/multimedia/ffmpeg/recordingengine/qffmpegvideoframeencoder.cpp
+6:#include "qffmpeg_p.h"
+7:#include "qffmpegencoderthread_p.h"
+./src/plugins/multimedia/ffmpeg/recordingengine/qffmpegaudioencoder_p.h
+6:#include "qffmpegthread_p.h"
+./src/plugins/multimedia/ffmpeg/recordingengine/qffmpegencoderthread_p.h
+4:#include "qffmpegaudioencoderutils_p.h"
+./src/plugins/multimedia/ffmpeg/recordingengine/qffmpegaudioencoderutils.cpp
+6:#include "qffmpegencoderthread_p.h"
+7:#include "qffmpeg_p.h"
+./src/plugins/multimedia/ffmpeg/recordingengine/qffmpegvideoencoder_p.h
+3:#include "qffmpegrecordingengine_p.h"
+4:#include "qffmpegmediaformatinfo_p.h"
+5:#include "qffmpegvideoframeencoder_p.h"
+9:#include "qffmpegaudioencoder_p.h"
+10:#include "qffmpegaudioinput_p.h"
+12:#include "qffmpegvideobuffer_p.h"
+13:#include "qffmpegvideoencoder_p.h"
+14:#include "qffmpegmediametadata_p.h"
+15:#include "qffmpegmuxer_p.h"
+20:static Q_LOGGING_CATEGORY(qLcFFmpegEncoder, "qt.multimedia.ffmpeg.encoder");
+56:    std::optional<AVPixelFormat> hwPixelFormat = source->ffmpegHWPixelFormat()
+57:            ? AVPixelFormat(*source->ffmpegHWPixelFormat())
+63:                              << "frameRate=" << frameFormat.frameRate() << "ffmpegHWPixelFormat="
+126:    // else ffmpeg might crash
+204:        // ffmpeg video buffer, let's use the native AVFrame stored in there
+261:#include "moc_qffmpegrecordingengine_p.cpp"
+./src/plugins/multimedia/ffmpeg/recordingengine/qffmpegrecordingengine.cpp
+3:#include "qffmpegencoderoptions_p.h"
+122:        // ffmpeg uses a different scale going from 0 to 11800.
+136:    // Under the hood, ffmpeg sets
+./src/plugins/multimedia/ffmpeg/recordingengine/qffmpegencoderoptions.cpp
+3:#include "qffmpegaudioencoder_p.h"
+4:#include "qffmpegaudioencoderutils_p.h"
+5:#include "qffmpegaudioinput_p.h"
+6:#include "qffmpegencoderoptions_p.h"
+7:#include "qffmpegmuxer_p.h"
+8:#include "qffmpegrecordingengine_p.h"
+9:#include "qffmpegmediaformatinfo_p.h"
+16:static Q_LOGGING_CATEGORY(qLcFFmpegAudioEncoder, "qt.multimedia.ffmpeg.audioencoder");
+./src/plugins/multimedia/ffmpeg/recordingengine/qffmpegaudioencoder.cpp
+3:#include "qffmpegvideoencoder_p.h"
+4:#include "qffmpegmuxer_p.h"
+5:#include "qffmpegvideobuffer_p.h"
+6:#include "qffmpegrecordingengine_p.h"
+7:#include "qffmpegvideoframeencoder_p.h"
+14:static Q_LOGGING_CATEGORY(qLcFFmpegVideoEncoder, "qt.multimedia.ffmpeg.videoencoder");
+24:    AVPixelFormat ffmpegPixelFormat =
+30:        // set some default frame rate since ffmpeg has UB if it's 0.
+35:            VideoFrameEncoder::create(settings, format.frameSize(), frameRate, ffmpegPixelFormat,
+./src/plugins/multimedia/ffmpeg/recordingengine/qffmpegvideoencoder.cpp
+17:#include "qffmpeghwaccel_p.h"
+./src/plugins/multimedia/ffmpeg/recordingengine/qffmpegvideoframeencoder_p.h
+17:#include "qffmpeg_p.h"
+18:#include "qffmpeghwaccel_p.h"
+./src/plugins/multimedia/ffmpeg/recordingengine/qffmpegvideoencoderutils_p.h
+17:#include "qffmpegthread_p.h"
+18:#include "qffmpegencodingformatcontext_p.h"
+./src/plugins/multimedia/ffmpeg/recordingengine/qffmpegrecordingengine_p.h
+3:#include "qffmpegmuxer_p.h"
+4:#include "qffmpegrecordingengine_p.h"
+11:static Q_LOGGING_CATEGORY(qLcFFmpegMuxer, "qt.multimedia.ffmpeg.muxer");
+./src/plugins/multimedia/ffmpeg/recordingengine/qffmpegmuxer.cpp
+3:#include "qffmpegencoderthread_p.h"
+./src/plugins/multimedia/ffmpeg/recordingengine/qffmpegencoderthread.cpp
+6:#include "qffmpegsurfacecapturegrabber_p.h"
+./src/plugins/multimedia/ffmpeg/qeglfsscreencapture.cpp
+3:#include "qffmpegaudiodecoder_p.h"
+4:#include "qffmpegresampler_p.h"
+7:#include "qffmpegplaybackengine_p.h"
+8:#include "playbackengine/qffmpegrenderer_p.h"
+12:static Q_LOGGING_CATEGORY(qLcAudioDecoder, "qt.multimedia.ffmpeg.audioDecoder")
+245:#include "moc_qffmpegaudiodecoder_p.cpp"
+247:#include "qffmpegaudiodecoder.moc"
+./src/plugins/multimedia/ffmpeg/qffmpegaudiodecoder.cpp
+4:#include "qffmpegscreencapture_dxgi_p.h"
+5:#include "qffmpegsurfacecapturegrabber_p.h"
+27:static Q_LOGGING_CATEGORY(qLcScreenCaptureDxgi, "qt.multimedia.ffmpeg.screencapturedxgi")
+./src/plugins/multimedia/ffmpeg/qffmpegscreencapture_dxgi.cpp
+4:#include "qffmpegioutils_p.h"
+6:#include "qffmpegdefs_p.h"
+./src/plugins/multimedia/ffmpeg/qffmpegioutils.cpp
+7:#include "qffmpegsurfacecapturegrabber_p.h"
+./src/plugins/multimedia/ffmpeg/qgrabwindowsurfacecapture.cpp
+38:    std::optional<int> ffmpegHWPixelFormat() const override;
+./src/plugins/multimedia/ffmpeg/qavfscreencapture_p.h
+3:        "Id": "ffmpeg",
+7:        "QtUsage": "The FFmpeg media backend uses the \\l {https://ffmpeg.org}{FFmpeg framework}. FFmpeg is licensed under LGPLv2.1 or later versions of the licenses. Note that, while FFmpeg also features some optional components available under GPL or LGPLv3, the binaries that ship with Qt in the online installer do not contain these components. See the \\l {https://ffmpeg.org/legal.html}{FFmpeg licensing page} for further details.",
+8:        "Homepage": "https://ffmpeg.org/",
+17:        "Id": "ffmpeg-libjpeg",
+21:        "QtUsage": "The FFmpeg media backend uses modified code from libjpeg in `libavcodec/jfdctfst.c`, `libavcodec/jfdctint_template.c` and `libavcodec/jrevdct.c`. For list of modifications, see \\l {https://git.ffmpeg.org/ffmpeg.git}{FFmpeg source code management system}.",
+30:        "Id": "ffmpeg-zlib",
+43:        "Id": "ffmpeg-boost",
+./src/3rdparty/ffmpeg/qt_attribution.json
+248:    // To be investigated: registering of the source might be removed after switching on the ffmpeg
+./src/multimedia/playback/qmediaplayer.cpp
+20:{https://ffmpeg.org/}{FFmpeg} headers and libraries on most platforms.
+42:the \c{<FFMPEG_DIR>} variable or specify the \c{-no-feature-ffmpeg}
+./src/multimedia/doc/src/qtmultimedia-building-from-source.qdoc
+190:    In this release the \l {http://ffmpeg.org}{FFmpeg framework} is set as the
+251:    In order to force assign FFmpeg as the used backend, set the variable to \c ffmpeg:
+254:    export QT_MEDIA_BACKEND=ffmpeg
+./src/multimedia/doc/src/qtmultimedia-index.qdoc
+27:qt_find_package(FFmpeg OPTIONAL_COMPONENTS AVCODEC AVFORMAT AVUTIL SWRESAMPLE SWSCALE PROVIDED_TARGETS FFmpeg::avcodec FFmpeg::avformat FFmpeg::avutil FFmpeg::swresample FFmpeg::swscale MODULE_NAME multimedia QMAKE_LIB ffmpeg)
+75:qt_feature("ffmpeg" PRIVATE
+77:    ENABLE INPUT_ffmpeg STREQUAL 'yes'
+78:    DISABLE INPUT_ffmpeg STREQUAL 'no'
+191:qt_configure_add_summary_entry(ARGS "ffmpeg")
+./src/multimedia/configure.cmake
+42:static const auto FFmpegBackend = QStringLiteral("ffmpeg");
+53:    // Return ffmpeg backend by default.
+58:    // Return platform backend (non-ffmpeg) by default.
+./src/multimedia/platform/qplatformmediaintegration.cpp
+8:std::optional<int> QPlatformVideoSource::ffmpegHWPixelFormat() const
+./src/multimedia/platform/qplatformvideosource.cpp
+42:    virtual std::optional<int> ffmpegHWPixelFormat() const;
+./src/multimedia/platform/qplatformvideosource_p.h
+245:                // It seems that ffmpeg is processing images for too long (and does not close it)
+./src/android/jar/src/org/qtproject/qt/android/multimedia/QtCamera2.java
+7:# Try to find the required ffmpeg components (default: AVFORMAT, AVUTIL, AVCODEC)
+81:      # llvm-mingv builds aux ffmpeg static libs like lib/libavutil.dll.a and cmake finds
+131:      set(__find_ffmpeg_backup_root_dir "${CMAKE_FIND_ROOT_PATH}")
+155:      ffmpeg include
+180:    set(CMAKE_FIND_ROOT_PATH "${__find_ffmpeg_backup_root_dir}")
+253:function(__ffmpeg_internal_set_dependencies lib)
+306:          __ffmpeg_internal_set_dependencies(${_lowerComponent})
+331:  message(WARNING "One ffmpeg library dir is expected, found dirs: ${FFMPEG_LIBRARY_DIRS}")
+./cmake/FindFFmpeg.cmake
+39:    variableValue: ffmpeg
+./coin/instructions/run_ffmpeg_backend_tests.yaml
+12:    - !include "{{qt/qtmultimedia}}/run_ffmpeg_backend_tests.yaml"
+./coin/module_config.yaml
+grep: ./ffmpeg.out: input file is also the output
+27:    return QPlatformMediaIntegration::instance()->name() == "ffmpeg";
+./tests/auto/integration/shared/mediabackendutils.h
+161:            QSKIP("QTBUG-116671: SKIP on linux CI to avoid crashes in ffmpeg. To be fixed.");
+190:            QSKIP("QTBUG-116671: SKIP on linux CI to avoid crashes in ffmpeg. To be fixed.");
+./tests/auto/integration/qwindowcapturebackend/tst_qwindowcapturebackend.cpp
+384:        QSKIP("QTBUG-116671: SKIP on linux CI to avoid crashes in ffmpeg. To be fixed.");
+./tests/auto/integration/qscreencapturebackend/tst_qscreencapturebackend.cpp
+2459:    // ffmpeg detects stream an incorrect stream duration, so we take
+./tests/auto/integration/qmediaplayerbackend/tst_qmediaplayerbackend.cpp
+32:            backends << "ffmpeg";
+34:        backends << "android" << "ffmpeg";
+36:        backends << "darwin" << "ffmpeg";
+42:        backends << "ffmpeg" << "gstreamer";
+./tests/auto/integration/backends/tst_backends.cpp

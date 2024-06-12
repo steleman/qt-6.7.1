@@ -1,0 +1,31 @@
+dependencies:
+  ../qtdeclarative:
+    ref: 734849e4577b75e85420b08ddb55974482bbd063
+    required: true
+  ../qtgraphs:
+    ref: 4cf0173471641eb4ee27054bf320f7187af03571
+    required: false
+  ../qthttpserver:
+    ref: 07e4bafdfd178d29c8137041c7fdd1f156884864
+    required: false
+  ../qtlocation:
+    ref: cd76b93b223c651d15880e926271ac8c0c24896f
+    required: false
+  ../qtmultimedia:
+    ref: 103cde748b78844f01d4972a3c3069a78b97cbd4
+    required: false
+  ../qtpositioning:
+    ref: 07e8e07c427fa10cbb4994aa4a0f035329303092
+    required: false
+  ../qtshadertools:
+    ref: 8644496ddbcb2480c3b6cab92022c1216d3f5eaa
+    required: false
+  ../qttools:
+    ref: ea5b1ca44ab8b82f050cf306f3ed7840a5d26ced
+    required: true
+  ../qtwebengine:
+    ref: 2ccbc2bb78bfd1cc03b45361553f4c3d63b31c26
+    required: false
+  ../qtwebsockets:
+    ref: f84f65fc877cd7f18554d2eddc6369f17dc53ec6
+    required: false
